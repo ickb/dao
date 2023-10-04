@@ -1,0 +1,29 @@
+{
+  "name": "ckb-utils",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ckb-lumos/base": "^0.20.0",
+    "@ckb-lumos/bi": "^0.20.0",
+    "@ckb-lumos/ckb-indexer": "^0.20.0",
+    "@ckb-lumos/codec": "^0.20.0",
+    "@ckb-lumos/common-scripts": "^0.20.0",
+    "@ckb-lumos/config-manager": "^0.20.0",
+    "@ckb-lumos/hd": "^0.20.0",
+    "@ckb-lumos/helpers": "^0.20.0",
+    "@ckb-lumos/rpc": "^0.20.0",
+    "keccak": "^3.0.3"
+  },
+  "devDependencies": {
+    "@types/keccak": "^3.0.1",
+    "typescript": "^5.1.6"
+  }
+}
