@@ -6,13 +6,19 @@ import { Mutex } from "./mutex";
 type RpcDataType = {
     url: string,
     rpc: RPC,
+    rpcBatcher: {
+        add: <T>(request: string) => Promise<T>,
+        process: () => void
+    }
     indexer: Indexer
 }
 
-function newRpcStateFrom(url: string): RpcDataType {
+function newRpcStateFrom(url: string) {
+    const rpc = new RPC(url, { timeout: 10000 })
     return {
         url,
-        rpc: new RPC(url, { timeout: 10000 }),
+        rpc,
+        rpcBatcher: createRPCBatcher(rpc),
         indexer: new Indexer(url)
     }
 }
@@ -48,8 +54,71 @@ export async function getRpc() {
     return (await getRpcState()).rpc;
 }
 
+export async function getRpcBatcher() {
+    return (await getRpcState()).rpcBatcher;
+}
+
 export async function getSyncedIndexer() {
     const indexer = (await getRpcState()).indexer;
     await indexer.waitForSync();
     return indexer;
+}
+
+type Callback = {
+    resolve: (x: any) => void;
+    reject: (x: any) => void;
+}
+
+function createRPCBatcher(rpc: RPC) {
+    const batcherState = new Mutex(new Map<string, Callback[]>());
+
+    function process() {
+        batcherState.update(async (_requests) => {
+            if (_requests.size > 0) {
+                _process(rpc, _requests);
+            }
+            return new Map();
+        });
+    }
+
+    async function add<T>(request: string) {
+        return new Promise<T>((resolve, reject) =>
+            batcherState.update(async (requests) => {
+                //Set delayed executor for new batch request
+                if (requests.size == 0) {
+                    setTimeout(process, 50);
+                }
+
+                let callbacks = requests.get(request) || [];
+                callbacks = [...callbacks, { resolve, reject }];
+                return requests.set(request, callbacks);
+            })
+        );
+    }
+
+    return { add, process }
+}
+
+async function _process(rpc: RPC, requests: Map<string, Callback[]>) {
+    const batch = rpc.createBatchRequest();
+    for (const k of requests.keys()) {
+        batch.add(...k.split('/'));
+    }
+
+    try {
+        const results = await (batch.exec() as Promise<any[]>);
+        const allCallbacks = [...requests.values()];
+        for (const i of results.keys()) {
+            const res = results[i];
+            for (const callback of allCallbacks[i]) {
+                callback.resolve(res);
+            }
+        }
+    } catch (error) {
+        for (const callbacks of requests.values()) {
+            for (const callback of callbacks) {
+                callback.reject(error);
+            }
+        }
+    }
 }
