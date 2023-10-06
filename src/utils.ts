@@ -2,7 +2,9 @@ import { BI, BIish } from "@ckb-lumos/bi"
 import { getConfig } from "@ckb-lumos/config-manager/lib";
 import { Cell, CellDep, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
-import { getRpc } from "./rpc";
+import { getRpc, getSyncedIndexer } from "./rpc";
+import { TransactionBuilder } from "./domain_logic";
+import { CellCollector } from "@ckb-lumos/ckb-indexer";
 
 export function defaultScript(name: string): Script {
     let configData = getConfig().SCRIPTS[name];
@@ -134,4 +136,31 @@ export async function getLiveCell(outPoint: OutPoint) {
         blockHash,
         blockNumber
     }
+}
+
+export async function fund(transactionBuilder: TransactionBuilder) {
+    const indexer = await getSyncedIndexer();
+
+    const collector = new CellCollector(indexer, {
+        scriptSearchMode: "exact",
+        withData: true,
+        type: "empty",
+        lock: transactionBuilder.getAccountLock()
+    });
+
+    for await (const cell of collector.collect()) {
+        if (cell.data !== "0x") {
+            continue;
+        }
+
+        transactionBuilder.add("input", "end", cell);
+        try {
+            transactionBuilder.toTransactionSkeleton()
+        } catch {
+            continue;
+        }
+        return transactionBuilder;
+    }
+
+    throw Error("Not enough funds to cover the output cells occupied capacity");
 }

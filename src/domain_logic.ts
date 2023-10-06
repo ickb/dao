@@ -1,11 +1,10 @@
 import { RPC } from "@ckb-lumos/rpc";
-import { BI, parseUnit } from "@ckb-lumos/bi"
-import { TransactionSkeleton, TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { BI } from "@ckb-lumos/bi"
+import { TransactionSkeleton, TransactionSkeletonType, minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import { bytes } from "@ckb-lumos/codec";
 import { Cell, CellDep, Header, Hexadecimal, Script, Transaction, WitnessArgs, blockchain } from "@ckb-lumos/base";
 import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible } from "@ckb-lumos/common-scripts/lib/dao";
-import { Uint128LE, Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
-import { hexify } from "@ckb-lumos/codec/lib/bytes";
+import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
 import { calculateFee, defaultCellDeps, defaultScript, isDAODeposit, isDAOWithdrawal, isScript, scriptEq, txSize } from "./utils";
 import { getConfig } from "@ckb-lumos/config-manager";
 import { getRpc } from "./rpc";
@@ -45,7 +44,6 @@ export class TransactionBuilder {
         this.outputs = [];
     }
 
-
     add(source: "input" | "output", position: "start" | "end", ...cells: Cell[]) {
         if (source === "input") {
             if (position === "start") {
@@ -71,11 +69,7 @@ export class TransactionBuilder {
     async buildAndSend(secondsTimeout: number = 600) {
         await this.customBuildStep(this);
 
-        const ckbDelta = await this.getCkbDelta();
-
-        const fee = calculateFee(txSize(await this.buildWithChange(ckbDelta)), this.feeRate);
-
-        const transaction = await this.buildWithChange(ckbDelta.sub(fee));
+        const { transaction, fee } = await this.toTransactionSkeleton();
 
         console.log("Transaction Skeleton:");
         console.log(JSON.stringify(transaction, null, 2));
@@ -90,23 +84,34 @@ export class TransactionBuilder {
         return { transaction, fee, signedTransaction, txHash }
     }
 
+    async toTransactionSkeleton() {
+        const ckbDelta = await this.getCkbDelta();
+
+        const fee = calculateFee(txSize(await this.buildWithChange(ckbDelta)), this.feeRate);
+
+        return { transaction: await this.buildWithChange(ckbDelta.sub(fee)), fee };
+    }
+
     protected async buildWithChange(ckbDelta: BI) {
         const changeCells: Cell[] = [];
         if (ckbDelta.eq(0)) {
             //Do nothing
-        } else if (ckbDelta.gte(parseUnit("62", "ckb"))) {
-            changeCells.push({
+        } else {
+            const changeCell = {
                 cellOutput: {
                     capacity: ckbDelta.toHexString(),
                     lock: this.accountLock,
                     type: undefined,
                 },
                 data: "0x"
-            });
-        } else {
-            throw Error("Not enough funds to execute the transaction");
+            }
+            const minimalCapacity = minimalCellCapacityCompatible(changeCell, { validate: false });
+            if (ckbDelta.gte(minimalCapacity)) {
+                changeCells.push(changeCell);
+            } else {
+                throw Error("Not enough funds to execute the transaction");
+            }
         }
-
         let transaction = TransactionSkeleton();
         transaction = transaction.update("inputs", (i) => i.push(...this.inputs));
         transaction = transaction.update("outputs", (o) => o.push(...this.outputs, ...changeCells));
@@ -166,6 +171,10 @@ export class TransactionBuilder {
         }
 
         return header;
+    }
+
+    getAccountLock(): Script {
+        return { ...this.accountLock }
     }
 }
 
