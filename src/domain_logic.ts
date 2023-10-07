@@ -12,14 +12,14 @@ import { getRpc } from "./rpc";
 type signerType = (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>;
 
 export class TransactionBuilder {
-    protected accountLock: Script;
-    protected signer: signerType
+    protected readonly accountLock: Script;
+    protected readonly signer: signerType
 
-    protected blockNumber2Header: Map<Hexadecimal, Header>;
+    protected readonly blockNumber2Header: Map<Hexadecimal, Header>;
 
-    protected customBuildStep: (b: TransactionBuilder) => Promise<void>;
+    protected readonly customBuildStep: (b: TransactionBuilder) => Promise<void>;
 
-    protected feeRate: BI
+    protected readonly feeRate: BI
 
     protected inputs: Cell[];
     protected outputs: Cell[];
@@ -71,13 +71,7 @@ export class TransactionBuilder {
 
         const { transaction, fee } = await this.toTransactionSkeleton();
 
-        console.log("Transaction Skeleton:");
-        console.log(JSON.stringify(transaction, null, 2));
-
         const signedTransaction = await this.signer(transaction, this.accountLock);
-
-        console.log("Signed Transaction:");
-        console.log(JSON.stringify(signedTransaction, null, 2));
 
         const txHash = await sendTransaction(signedTransaction, await getRpc(), secondsTimeout);
 
@@ -105,10 +99,9 @@ export class TransactionBuilder {
                 },
                 data: "0x"
             }
+            changeCells.push(changeCell);
             const minimalCapacity = minimalCellCapacityCompatible(changeCell, { validate: false });
-            if (ckbDelta.gte(minimalCapacity)) {
-                changeCells.push(changeCell);
-            } else {
+            if (!ckbDelta.gte(minimalCapacity)) {
                 throw Error("Not enough funds to execute the transaction");
             }
         }
@@ -125,6 +118,15 @@ export class TransactionBuilder {
         transaction = await addInputSinces(transaction, async (c: Cell) => this.withdrawedDaoSince(c));
 
         transaction = await addWitnessPlaceholders(transaction, this.accountLock, getBlockHash);
+
+        transaction = transaction.update(
+            "fixedEntries", (e) => e.push(
+                { field: "inputs", index: transaction.inputs.size },
+                { field: "outputs", index: transaction.outputs.size - changeCells.length },
+                { field: "headerDeps", index: transaction.headerDeps.size },
+                { field: "inputSinces", index: transaction.inputSinces.size }
+            )
+        );
 
         return transaction;
     }
