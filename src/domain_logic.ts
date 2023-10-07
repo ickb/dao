@@ -7,17 +7,13 @@ import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
 import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
 import { calculateFee, defaultCellDeps, defaultScript, isDAODeposit, isDAOWithdrawal, isScript, scriptEq, txSize } from "./utils";
 import { getConfig } from "@ckb-lumos/config-manager";
-import { getRpc } from "./rpc";
-
-type signerType = (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>;
+import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./rpc";
 
 export class TransactionBuilder {
     protected readonly accountLock: Script;
-    protected readonly signer: signerType
+    protected readonly signer: (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>;
 
-    protected readonly blockNumber2Header: Map<Hexadecimal, Header>;
-
-    protected readonly customBuildStep: (b: TransactionBuilder) => Promise<void>;
+    protected readonly getHeaderByNumber: (blockNumber: Hexadecimal) => Promise<Header>;
 
     protected readonly feeRate: BI
 
@@ -26,17 +22,14 @@ export class TransactionBuilder {
 
     constructor(
         accountLock: Script,
-        signer: signerType,
-        knownHeaders: Header[],
-        customBuildStep: (b: TransactionBuilder) => Promise<void> = () => Promise.resolve(),
+        signer: (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>,
+        getHeaderByNumber: (blockNumber: Hexadecimal) => Promise<Header> = getHeaderByNumber_,
         feeRate: BI = BI.from(1000),
     ) {
         this.accountLock = accountLock;
         this.signer = signer;
 
-        this.blockNumber2Header = new Map(knownHeaders.map(h => [h.number, h]));
-
-        this.customBuildStep = customBuildStep;
+        this.getHeaderByNumber = getHeaderByNumber;
 
         this.feeRate = feeRate;
 
@@ -67,8 +60,6 @@ export class TransactionBuilder {
     }
 
     async buildAndSend(secondsTimeout: number = 600) {
-        await this.customBuildStep(this);
-
         const { transaction, fee } = await this.toTransactionSkeleton();
 
         const signedTransaction = await this.signer(transaction, this.accountLock);
@@ -159,20 +150,6 @@ export class TransactionBuilder {
         const depositHeader = await this.getHeaderByNumber(Uint64LE.unpack(c.data).toHexString());
 
         return calculateDaoEarliestSinceCompatible(depositHeader.epoch, withdrawalHeader.epoch);
-    }
-
-    protected async getHeaderByNumber(blockNumber: Hexadecimal) {
-        let header = this.blockNumber2Header.get(blockNumber);
-
-        if (!header) {
-            header = await (await getRpc()).getHeaderByNumber(blockNumber);
-            this.blockNumber2Header.set(blockNumber, header);
-            if (!header) {
-                throw Error("Header not found from blockNumber " + blockNumber);
-            }
-        }
-
-        return header;
     }
 
     getAccountLock(): Script {

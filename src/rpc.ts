@@ -59,6 +59,15 @@ export async function getRpcBatcher() {
     return (await getRpcState()).rpcBatcher;
 }
 
+export async function getHeaderByNumber(blockNumber: Hexadecimal): Promise<Header> {
+    const get = (await getRpcState()).rpcBatcher.get;
+    const res = await get("getHeaderByNumber/" + blockNumber, true);
+    if (res === undefined) {
+        throw Error("Header not found from blockNumber " + blockNumber);
+    }
+    return res as Header;
+}
+
 export async function getSyncedIndexer() {
     const indexer = (await getRpcState()).indexer;
     await indexer.waitForSync();
@@ -123,7 +132,7 @@ function createRPCBatcher(rpc: RPC) {
             for (const i of results.keys()) {
                 const res = results[i];
                 const [request, { cacheable, callbacks }] = entries[i];
-                if (cacheable) {
+                if (cacheable && res !== undefined) {
                     newCache.set(request, res);
                 }
                 for (const callback of callbacks) {
