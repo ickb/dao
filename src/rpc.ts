@@ -2,12 +2,13 @@ import { RPC } from "@ckb-lumos/rpc";
 import { getConfig } from "@ckb-lumos/config-manager/lib";
 import { Indexer } from "@ckb-lumos/ckb-indexer";
 import { Mutex } from "./mutex";
+import { Header, Hexadecimal } from "@ckb-lumos/base";
 
 type RpcDataType = {
     url: string,
     rpc: RPC,
     rpcBatcher: {
-        add: <T>(request: string) => Promise<T>,
+        get: <T>(request: string, cacheable: boolean) => Promise<T>,
         process: () => void
     }
     indexer: Indexer
@@ -70,55 +71,87 @@ type Callback = {
 }
 
 function createRPCBatcher(rpc: RPC) {
-    const batcherState = new Mutex(new Map<string, Callback[]>());
+    const batcherState = new Mutex(
+        {
+            pending: new Map<string, { cacheable: boolean, callbacks: Callback[] }>(),
+            cache: new Map<string, any>()
+        }
+    );
 
     function process() {
-        batcherState.update(async (_requests) => {
-            if (_requests.size > 0) {
-                _process(rpc, _requests);
+        batcherState.update(async ({ pending, cache }) => {
+            if (pending.size > 0) {
+                _process(rpc, pending);
             }
-            return new Map();
+            return { pending: new Map(), cache };
         });
     }
 
-    async function add<T>(request: string) {
+    async function get<T>(request: string, cacheable: boolean) {
         return new Promise<T>((resolve, reject) =>
-            batcherState.update(async (requests) => {
+            batcherState.update(async ({ pending, cache }) => {
+                if (cacheable && cache.has(request)) {
+                    const res = cache.get(request);
+                    resolve(res);
+                    cache.set(request, res);
+                    return { pending, cache }
+                }
+
                 //Set delayed executor for new batch request
-                if (requests.size == 0) {
+                if (pending.size == 0) {
                     setTimeout(process, 50);
                 }
 
-                let callbacks = requests.get(request) || [];
+                let { callbacks } = pending.get(request) || { callbacks: [] };
                 callbacks = [...callbacks, { resolve, reject }];
-                return requests.set(request, callbacks);
+                pending = pending.set(request, { cacheable, callbacks })
+                return { pending, cache };
             })
         );
     }
 
-    return { add, process }
-}
+    async function _process(rpc: RPC, requests: Map<string, { cacheable: boolean, callbacks: Callback[] }>) {
+        const batch = rpc.createBatchRequest();
+        for (const k of requests.keys()) {
+            batch.add(...k.split('/'));
+        }
 
-async function _process(rpc: RPC, requests: Map<string, Callback[]>) {
-    const batch = rpc.createBatchRequest();
-    for (const k of requests.keys()) {
-        batch.add(...k.split('/'));
-    }
+        try {
+            const results = await (batch.exec() as Promise<any[]>);
+            const entries = [...requests.entries()];
+            const newCache = new Map<string, any>();
+            for (const i of results.keys()) {
+                const res = results[i];
+                const [request, { cacheable, callbacks }] = entries[i];
+                if (cacheable) {
+                    newCache.set(request, res);
+                }
+                for (const callback of callbacks) {
+                    callback.resolve(res);
+                }
+            }
 
-    try {
-        const results = await (batch.exec() as Promise<any[]>);
-        const allCallbacks = [...requests.values()];
-        for (const i of results.keys()) {
-            const res = results[i];
-            for (const callback of allCallbacks[i]) {
-                callback.resolve(res);
+            if (newCache.size > 0) {
+                batcherState.update(async ({ pending, cache }) => {
+                    for (const [req, res] of newCache.entries()) {
+                        if (cache.size >= 65536) {
+                            cache.delete(cache.keys().next().value);
+                        }
+                        cache.set(req, res);
+                    }
+                    return { pending, cache };
+                });
+            }
+
+        } catch (error) {
+            for (const { callbacks } of requests.values()) {
+                for (const callback of callbacks) {
+                    callback.reject(error);
+                }
             }
         }
-    } catch (error) {
-        for (const callbacks of requests.values()) {
-            for (const callback of callbacks) {
-                callback.reject(error);
-            }
-        }
     }
+
+    return { get, process }
 }
+
