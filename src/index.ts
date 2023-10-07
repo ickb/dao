@@ -1,3 +1,4 @@
+export * from './actions';
 export * from './domain_logic';
 export * from './mutex';
 export * from './pwlock_signer';

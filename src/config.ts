@@ -4,8 +4,9 @@ import { ScriptConfig, ScriptConfigs, getConfig, initializeConfig, } from "@ckb-
 import { Cell, HashType, Hexadecimal, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { vector } from "@ckb-lumos/codec/lib/molecule";
 import { getRpc } from "./rpc";
-import { defaultScript, fund } from "./utils";
+import { defaultScript } from "./utils";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
+import { fund } from "./actions";
 
 async function getGenesisBlock() {
     return (await getRpc()).getBlockByNumber("0x0");
