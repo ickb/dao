@@ -39,18 +39,6 @@ export type ScriptData = {
     hashType: HashType
 }
 
-// async function ScriptDataFrom(folderPath: string) {
-//     const result: ScriptData[] = [];
-//     for (const name of (await readdir(folderPath)).sort()) {
-//         const rawData = await readFile(folderPath + name);
-//         const hexData = "0x" + rawData.toString("hex");
-//         const codeHash = ckbHash(rawData);
-//         const hashType = "data1";
-//         result.push({ name, hexData, codeHash, hashType });
-//     }
-//     return result;
-// }
-
 export async function deploy(transactionBuilder: TransactionBuilder, scriptData: ScriptData[], newCellLock: Script = defaultScript("SECP256K1_BLAKE160")) {
     const dataCells: Cell[] = [];
     for (const { name, hexData, codeHash, hashType } of scriptData) {
