@@ -14,6 +14,6 @@ export interface EthereumProvider {
     removeEventListener: (event: 'accountsChanged', listener: (addresses: string[]) => void) => void;
     request: EthereumRpc;
 }
-export declare const ethereum: EthereumProvider;
+export declare function getEthereumProvider(): EthereumProvider;
 export declare function signer(transaction: TransactionSkeletonType, accountLock: Script): Promise<import("@ckb-lumos/base").Transaction>;
 export {};

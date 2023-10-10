@@ -18,8 +18,10 @@ export interface EthereumProvider {
     request: EthereumRpc;
 }
 
-// @ts-ignore
-export const ethereum = window.ethereum as EthereumProvider;
+export function getEthereumProvider() {
+    // @ts-ignore
+    return window.ethereum as EthereumProvider;
+}
 
 export async function signer(transaction: TransactionSkeletonType, accountLock: Script) {
     // just like P2PKH: https://github.com/nervosnetwork/ckb-system-scripts/wiki/How-to-sign-transaction
@@ -31,6 +33,8 @@ export async function signer(transaction: TransactionSkeletonType, accountLock: 
             digest: () => keccak.digest(),
         },
     })[0];
+
+    const ethereum = getEthereumProvider();
 
     let signedMessage = await ethereum.request({
         method: "personal_sign",

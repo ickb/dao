@@ -32,17 +32,6 @@ async function defaultDaoConfig() {
     };
 }
 exports.defaultDaoConfig = defaultDaoConfig;
-// async function ScriptDataFrom(folderPath: string) {
-//     const result: ScriptData[] = [];
-//     for (const name of (await readdir(folderPath)).sort()) {
-//         const rawData = await readFile(folderPath + name);
-//         const hexData = "0x" + rawData.toString("hex");
-//         const codeHash = ckbHash(rawData);
-//         const hashType = "data1";
-//         result.push({ name, hexData, codeHash, hashType });
-//     }
-//     return result;
-// }
 async function deploy(transactionBuilder, scriptData, newCellLock = (0, utils_1.defaultScript)("SECP256K1_BLAKE160")) {
     const dataCells = [];
     for (const { name, hexData, codeHash, hashType } of scriptData) {

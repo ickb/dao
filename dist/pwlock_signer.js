@@ -3,15 +3,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.signer = exports.ethereum = void 0;
+exports.signer = exports.getEthereumProvider = void 0;
 const keccak_1 = __importDefault(require("keccak"));
 const codec_1 = require("@ckb-lumos/codec");
 const base_1 = require("@ckb-lumos/base");
 const helpers_1 = require("@ckb-lumos/helpers");
 const common_scripts_1 = require("@ckb-lumos/common-scripts");
 const utils_1 = require("./utils");
-// @ts-ignore
-exports.ethereum = window.ethereum;
+function getEthereumProvider() {
+    // @ts-ignore
+    return window.ethereum;
+}
+exports.getEthereumProvider = getEthereumProvider;
 async function signer(transaction, accountLock) {
     // just like P2PKH: https://github.com/nervosnetwork/ckb-system-scripts/wiki/How-to-sign-transaction
     const keccak = (0, keccak_1.default)("keccak256");
@@ -21,9 +24,10 @@ async function signer(transaction, accountLock) {
             digest: () => keccak.digest(),
         },
     })[0];
-    let signedMessage = await exports.ethereum.request({
+    const ethereum = getEthereumProvider();
+    let signedMessage = await ethereum.request({
         method: "personal_sign",
-        params: [exports.ethereum.selectedAddress, messageForSigning.message],
+        params: [ethereum.selectedAddress, messageForSigning.message],
     });
     let v = Number.parseInt(signedMessage.slice(-2), 16);
     if (v >= 27)
