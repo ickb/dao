@@ -164,7 +164,7 @@ function addCellDeps(transaction: TransactionSkeletonType) {
 
     const prefix2Name: Map<string, string> = new Map();
     for (const scriptName in getConfig()) {
-        prefix2Name.set(scriptName.split("_")[0], scriptName);
+        prefix2Name.set(scriptName.split("$")[0], scriptName);
     }
 
     const serializeScript = (s: Script) => `${s.codeHash}-${s.hashType}`
@@ -172,7 +172,7 @@ function addCellDeps(transaction: TransactionSkeletonType) {
     for (const scriptName in getConfig()) {
         const s = defaultScript(scriptName);
         const cellDeps: CellDep[] = [];
-        for (const prefix of scriptName.split("_")) {
+        for (const prefix of scriptName.split("$")) {
             cellDeps.push(defaultCellDeps(prefix2Name.get(prefix)!));
         }
         serializedScript2CellDeps.set(serializeScript(s), cellDeps);
@@ -253,7 +253,7 @@ async function addWitnessPlaceholders(transaction: TransactionSkeletonType, acco
     }
 
     let paddingCountDown = 1//Only first occurrence
-    if ("PWLOCK" in getConfig().SCRIPTS && isScript(accountLock, defaultScript("PWLOCK"))) {
+    if ("PW_LOCK$SECP256K1_BLAKE160" in getConfig().SCRIPTS && isScript(accountLock, defaultScript("PW_LOCK$SECP256K1_BLAKE160"))) {
         paddingCountDown = transaction.inputs.size;//All occurrences
     }
 
