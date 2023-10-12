@@ -79,42 +79,35 @@ export async function deploy(transactionBuilder: TransactionBuilder, scriptData:
 export async function createDepGroup(transactionBuilder: TransactionBuilder, names: string[], newCellLock: Script = defaultScript("SECP256K1_BLAKE160")) {
     const rpc = (await getRpc());
     const oldConfig = getConfig();
-    const outPoints: OutPoint[] = [];
     const outPointsCodec = vector(blockchain.OutPoint);
+    const serializeOutPoint = (p: OutPoint) => `${p.txHash}-${p.index}`;
+    const serializedOutPoint2OutPoint: Map<string, OutPoint> = new Map();
     for (const name of names) {
         const s = oldConfig.SCRIPTS[name];
         if (s === undefined) {
             throw Error(`Script ${s} not found in Config`);
         }
 
+        const o: OutPoint = { txHash: s.TX_HASH, index: s.INDEX };
         if (s.DEP_TYPE === "code") {
-            outPoints.push({
-                txHash: s.TX_HASH,
-                index: s.INDEX
-            })
+            serializedOutPoint2OutPoint.set(serializeOutPoint(o), o);
         } else { //depGroup
-            const cell = (await rpc.getLiveCell({
-                txHash: s.TX_HASH,
-                index: s.INDEX
-            }, true)).cell;
-            for (const outPoint of outPointsCodec.unpack(cell.data.content)) {
-                outPoints.push({
-                    txHash: outPoint.txHash,
-                    index: BI.from(outPoint.index).toHexString()
-                });
+            const cell = (await rpc.getLiveCell(o, true)).cell;
+            for (const o_ of outPointsCodec.unpack(cell.data.content)) {
+                const o: OutPoint = { ...o_, index: BI.from(o_.index).toHexString() };
+                serializedOutPoint2OutPoint.set(serializeOutPoint(o), o);
             }
         }
     }
 
-    let packedOutPoints = vector(blockchain.OutPoint).pack(outPoints);
-    let hexOutPoints = "0x" + Buffer.from(packedOutPoints).toString('hex');
+    let packedOutPoints = outPointsCodec.pack([...serializedOutPoint2OutPoint.values()]);
     const cell: Cell = {
         cellOutput: {
             capacity: "0x42",
             lock: newCellLock,
             type: undefined
         },
-        data: hexOutPoints
+        data: "0x" + Buffer.from(packedOutPoints).toString('hex')
     };
     cell.cellOutput.capacity = minimalCellCapacityCompatible(cell).toHexString();
 
