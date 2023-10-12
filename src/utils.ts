@@ -2,7 +2,7 @@ import { BI, BIish } from "@ckb-lumos/bi"
 import { getConfig } from "@ckb-lumos/config-manager/lib";
 import { Cell, CellDep, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
-import { getRpc } from "./rpc";
+import { getRpc } from "./chain_adapter";
 
 export function defaultScript(name: string): Script {
     let configData = getConfig().SCRIPTS[name];
@@ -119,7 +119,7 @@ export function calculateFee(size: number, feeRate: BIish): BI {
 }
 
 export async function getLiveCell(outPoint: OutPoint) {
-    const rpc = await getRpc();
+    const rpc = getRpc();
     const res = await rpc.getLiveCell(outPoint, true);
     const blockHash = (await rpc.getTransactionProof([outPoint.txHash])).blockHash;
     const blockNumber = (await rpc.getBlock(blockHash)).header.number

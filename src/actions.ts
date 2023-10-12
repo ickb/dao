@@ -1,4 +1,4 @@
-import { getSyncedIndexer } from "./rpc";
+import { getSyncedIndexer } from "./chain_adapter";
 import { TransactionBuilder } from "./domain_logic";
 import { CellCollector } from "@ckb-lumos/ckb-indexer";
 import { DAO_DEPOSIT_DATA, defaultScript } from "./utils";

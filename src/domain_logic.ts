@@ -7,7 +7,7 @@ import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
 import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
 import { calculateFee, defaultCellDeps, defaultScript, isDAODeposit, isDAOWithdrawal, isScript, scriptEq, txSize } from "./utils";
 import { getConfig } from "@ckb-lumos/config-manager";
-import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./rpc";
+import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./chain_adapter";
 
 export class TransactionBuilder {
     protected readonly accountLock: Script;
@@ -64,7 +64,7 @@ export class TransactionBuilder {
 
         const signedTransaction = await this.signer(transaction, this.accountLock);
 
-        const txHash = await sendTransaction(signedTransaction, await getRpc(), secondsTimeout);
+        const txHash = await sendTransaction(signedTransaction, getRpc(), secondsTimeout);
 
         return { transaction, fee, signedTransaction, txHash }
     }

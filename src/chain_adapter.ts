@@ -1,10 +1,39 @@
 import { RPC } from "@ckb-lumos/rpc";
-import { getConfig } from "@ckb-lumos/config-manager/lib";
+import { Config, getConfig, initializeConfig, predefined } from "@ckb-lumos/config-manager/lib";
 import { Indexer } from "@ckb-lumos/ckb-indexer";
 import { Mutex } from "./mutex";
 import { Header, Hexadecimal } from "@ckb-lumos/base";
+import { daoConfig, secp256k1Blake160Config } from "./config";
 
-type RpcDataType = {
+const chain2RpcUrl = {
+    mainnet: "https://rpc.ankr.com/nervos_ckb",
+    testnet: "https://testnet.ckb.dev",
+    devnet: "http://127.0.0.1:8114/"
+};
+
+export type Chain = keyof typeof chain2RpcUrl;
+
+export function isChain(x: string): x is Chain {
+    return chain2RpcUrl.hasOwnProperty(x);
+}
+
+export function defaultRpcUrl(chain: Chain) {
+    return chain2RpcUrl[chain];
+}
+
+function newChainAdapter(chain: Chain, url: string = defaultRpcUrl(chain)) {
+    const rpc = new RPC(url, { timeout: 10000 })
+    return <ChainAdapter>{
+        chain,
+        url,
+        rpc,
+        rpcBatcher: createRPCBatcher(rpc),
+        indexer: new Indexer(url)
+    };
+}
+
+type ChainAdapter = {
+    chain: Chain,
     url: string,
     rpc: RPC,
     rpcBatcher: {
@@ -14,53 +43,44 @@ type RpcDataType = {
     indexer: Indexer
 }
 
-function newRpcStateFrom(url: string) {
-    const rpc = new RPC(url, { timeout: 10000 })
-    return {
-        url,
-        rpc,
-        rpcBatcher: createRPCBatcher(rpc),
-        indexer: new Indexer(url)
+let chainAdapter = newChainAdapter(getConfig().PREFIX == "ckb" ? "mainnet" : "testnet");
+
+export async function initializeChainAdapter(chain: Chain, config?: Config, url: string = defaultRpcUrl(chain)) {
+    if (chain != chainAdapter.chain || url !== chainAdapter.url) {
+        chainAdapter = newChainAdapter(chain, url);
     }
-}
-
-function _getRpcUrl() {
-    if (getConfig().PREFIX == "ckb") {
-        return "https://rpc.ankr.com/nervos_ckb";
-    } else {
-        return "http://127.0.0.1:8114/";
-    }
-}
-
-const rpcStateMutex = new Mutex<RpcDataType>(newRpcStateFrom(_getRpcUrl()));
-
-async function getRpcState() {
-    return new Promise(
-        (res: (s: RpcDataType) => void) => rpcStateMutex.update((s: RpcDataType) => {
-            let u = _getRpcUrl();
-            if (s.url !== u) {
-                s = newRpcStateFrom(u);
+    if (config !== undefined) {
+        //Do nothing
+    } else if (chain === "mainnet") {
+        config = predefined.LINA;
+    } else if (chain === "testnet") {
+        config = predefined.AGGRON4;
+    } else {//Devnet
+        config = {
+            PREFIX: "ckt",
+            SCRIPTS: {
+                SECP256K1_BLAKE160: await secp256k1Blake160Config(),
+                DAO: await daoConfig(),
             }
-            res(s);
-            return Promise.resolve(s);
-        })
-    );
+        }
+    }
+    initializeConfig(config);
 }
 
-export async function getRpcUrl() {
-    return (await getRpcState()).url;
+export function getRpcUrl() {
+    return chainAdapter.url;
 }
 
-export async function getRpc() {
-    return (await getRpcState()).rpc;
+export function getRpc() {
+    return chainAdapter.rpc;
 }
 
-export async function getRpcBatcher() {
-    return (await getRpcState()).rpcBatcher;
+export function getRpcBatcher() {
+    return chainAdapter.rpcBatcher;
 }
 
 export async function getHeaderByNumber(blockNumber: Hexadecimal): Promise<Header> {
-    const get = (await getRpcState()).rpcBatcher.get;
+    const get = chainAdapter.rpcBatcher.get;
     const res = await get("getHeaderByNumber/" + blockNumber, true);
     if (res === undefined) {
         throw Error("Header not found from blockNumber " + blockNumber);
@@ -69,7 +89,7 @@ export async function getHeaderByNumber(blockNumber: Hexadecimal): Promise<Heade
 }
 
 export async function getSyncedIndexer() {
-    const indexer = (await getRpcState()).indexer;
+    const indexer = chainAdapter.indexer;
     await indexer.waitForSync();
     return indexer;
 }
@@ -163,4 +183,3 @@ function createRPCBatcher(rpc: RPC) {
 
     return { get, process }
 }
-

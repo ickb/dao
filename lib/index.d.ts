@@ -7,3 +7,4 @@ export * from './pwlock_signer';
 export * from './secp256k1_signer';
 export * from './uint';
 export * from './utils';
+//# sourceMappingURL=index.d.ts.map

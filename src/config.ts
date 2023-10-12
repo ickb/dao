@@ -3,16 +3,16 @@ import { BI } from "@ckb-lumos/bi"
 import { ScriptConfig, ScriptConfigs, getConfig, initializeConfig, } from "@ckb-lumos/config-manager/lib";
 import { Cell, HashType, Hexadecimal, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { vector } from "@ckb-lumos/codec/lib/molecule";
-import { getRpc } from "./rpc";
+import { getRpc } from "./chain_adapter";
 import { defaultScript } from "./utils";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import { fund } from "./actions";
 
 async function getGenesisBlock() {
-    return (await getRpc()).getBlockByNumber("0x0");
+    return getRpc().getBlockByNumber("0x0");
 }
 
-export async function defaultSecp256k1Blake160Config(): Promise<ScriptConfig> {
+export async function secp256k1Blake160Config(): Promise<ScriptConfig> {
     return {
         CODE_HASH: "0x9bd7e06f3ecf4be0f2fcd2188b23f1b9fcc88e5d4b65a8637b17723bbda3cce8",
         HASH_TYPE: "type",
@@ -22,7 +22,7 @@ export async function defaultSecp256k1Blake160Config(): Promise<ScriptConfig> {
     };
 }
 
-export async function defaultDaoConfig(): Promise<ScriptConfig> {
+export async function daoConfig(): Promise<ScriptConfig> {
     return {
         CODE_HASH: "0x82d76d1b75fe2fd9a27dfbaa65a039221a380d76c926f378d3f81cf3e7e13f2e",
         HASH_TYPE: "type",
@@ -74,10 +74,12 @@ export async function deploy(transactionBuilder: TransactionBuilder, scriptData:
         PREFIX: oldConfig.PREFIX,
         SCRIPTS: { ...oldConfig.SCRIPTS, ...newScriptConfig }
     });
+
+    return txHash;
 }
 
 export async function createDepGroup(transactionBuilder: TransactionBuilder, names: string[], newCellLock: Script = defaultScript("SECP256K1_BLAKE160")) {
-    const rpc = (await getRpc());
+    const rpc = getRpc();
     const oldConfig = getConfig();
     const outPointsCodec = vector(blockchain.OutPoint);
     const serializeOutPoint = (p: OutPoint) => `${p.txHash}-${p.index}`;

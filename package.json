@@ -2,13 +2,13 @@
   "name": "lumos-utils",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "scripts": {
     "build": "tsc"
   },
   "files": [
-    "/dist"
+    "/lib"
   ],
   "keywords": [],
   "author": "",
