@@ -6,8 +6,8 @@ import { Cell, CellDep, Header, Hexadecimal, Script, Transaction, WitnessArgs, b
 import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible } from "@ckb-lumos/common-scripts/lib/dao";
 import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
 import { calculateFee, defaultCellDeps, defaultScript, isDAODeposit, isDAOWithdrawal, isScript, scriptEq, txSize } from "./utils";
-import { getConfig } from "@ckb-lumos/config-manager";
 import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./chain_adapter";
+import { getConfig } from "./config";
 
 export class TransactionBuilder {
     protected readonly accountLock: Script;
@@ -163,13 +163,13 @@ function addCellDeps(transaction: TransactionSkeletonType) {
     }
 
     const prefix2Name: Map<string, string> = new Map();
-    for (const scriptName in getConfig()) {
+    for (const scriptName in getConfig().SCRIPTS) {
         prefix2Name.set(scriptName.split("$")[0], scriptName);
     }
 
     const serializeScript = (s: Script) => `${s.codeHash}-${s.hashType}`
     const serializedScript2CellDeps: Map<string, CellDep[]> = new Map();
-    for (const scriptName in getConfig()) {
+    for (const scriptName in getConfig().SCRIPTS) {
         const s = defaultScript(scriptName);
         const cellDeps: CellDep[] = [];
         for (const prefix of scriptName.split("$")) {

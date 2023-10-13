@@ -1,6 +1,7 @@
 import { TransactionBuilder } from "./domain_logic";
 import { ScriptConfig } from "@ckb-lumos/config-manager/lib";
 import { HashType, Hexadecimal, Script } from "@ckb-lumos/base";
+export { getConfig, initializeConfig } from "@ckb-lumos/config-manager/lib";
 export declare function secp256k1Blake160Config(): Promise<ScriptConfig>;
 export declare function daoConfig(): Promise<ScriptConfig>;
 export type ScriptData = {

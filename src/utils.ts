@@ -1,8 +1,8 @@
 import { BI, BIish } from "@ckb-lumos/bi"
-import { getConfig } from "@ckb-lumos/config-manager/lib";
 import { Cell, CellDep, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { getRpc } from "./chain_adapter";
+import { getConfig } from "./config";
 
 export function defaultScript(name: string): Script {
     let configData = getConfig().SCRIPTS[name];

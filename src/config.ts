@@ -8,6 +8,8 @@ import { defaultScript } from "./utils";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import { fund } from "./actions";
 
+export { getConfig, initializeConfig } from "@ckb-lumos/config-manager/lib";
+
 async function getGenesisBlock() {
     return getRpc().getBlockByNumber("0x0");
 }
@@ -116,13 +118,12 @@ export async function createDepGroup(transactionBuilder: TransactionBuilder, nam
     const { txHash } = await (await fund(transactionBuilder.add("output", "start", cell))).buildAndSend();
 
     const newScriptConfig: ScriptConfigs = {};
-    let index = BI.from(0).toHexString();
     for (const name of names) {
         const s = oldConfig.SCRIPTS[name]!;
         newScriptConfig[name] = {
             ...s,
             TX_HASH: txHash,
-            INDEX: index,
+            INDEX: "0x0",
             DEP_TYPE: "depGroup",
         }
     }
