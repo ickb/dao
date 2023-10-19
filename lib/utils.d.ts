@@ -4,7 +4,7 @@ import { TransactionSkeletonType } from "@ckb-lumos/helpers";
 export declare function defaultScript(name: string): Script;
 export declare function defaultCellDeps(name: string): CellDep;
 export declare function scriptEq(s0: Script | undefined, s1: Script | undefined): boolean;
-export declare function isScript(s0: Script | undefined, s1: Script | undefined): boolean;
+export declare function scriptIs(s0: Script, name: string): boolean;
 export declare const DAO_DEPOSIT_DATA = "0x0000000000000000";
 export declare function isDAODeposit(c: Cell): boolean;
 export declare function isDAOWithdrawal(c: Cell): boolean;

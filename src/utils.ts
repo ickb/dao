@@ -33,10 +33,6 @@ export function defaultCellDeps(name: string): CellDep {
 }
 
 export function scriptEq(s0: Script | undefined, s1: Script | undefined) {
-    return isScript(s0, s1) && s0!.args === s1!.args;
-}
-
-export function isScript(s0: Script | undefined, s1: Script | undefined) {
     if (!s0 && !s1) {
         throw Error("Comparing two undefined Scripts")
     }
@@ -44,7 +40,12 @@ export function isScript(s0: Script | undefined, s1: Script | undefined) {
         return false;
     }
     return s0.codeHash === s1.codeHash &&
-        s0.hashType === s1.hashType;
+        s0.hashType === s1.hashType &&
+        s0.args === s1.args;
+}
+
+export function scriptIs(s0: Script, name: string) {
+    return scriptEq(s0, { ...defaultScript(name), args: s0.args });
 }
 
 export const DAO_DEPOSIT_DATA = "0x0000000000000000";

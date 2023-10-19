@@ -5,7 +5,7 @@ import { bytes } from "@ckb-lumos/codec";
 import { Cell, CellDep, Header, Hexadecimal, Script, Transaction, WitnessArgs, blockchain } from "@ckb-lumos/base";
 import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible } from "@ckb-lumos/common-scripts/lib/dao";
 import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
-import { calculateFee, defaultCellDeps, defaultScript, isDAODeposit, isDAOWithdrawal, isScript, scriptEq, txSize } from "./utils";
+import { calculateFee, defaultCellDeps, defaultScript, isDAODeposit, isDAOWithdrawal, scriptEq, scriptIs, txSize } from "./utils";
 import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./chain_adapter";
 import { getConfig } from "./config";
 
@@ -253,7 +253,8 @@ async function addWitnessPlaceholders(transaction: TransactionSkeletonType, acco
     }
 
     let paddingCountDown = 1//Only first occurrence
-    if ("PW_LOCK$SECP256K1_BLAKE160" in getConfig().SCRIPTS && isScript(accountLock, defaultScript("PW_LOCK$SECP256K1_BLAKE160"))) {
+    const pwLock = "PW_LOCK$SECP256K1_BLAKE160";
+    if (pwLock in getConfig().SCRIPTS && scriptIs(accountLock, pwLock)) {
         paddingCountDown = transaction.inputs.size;//All occurrences
     }
 
