@@ -7,7 +7,7 @@ import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
 import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
 import { calculateFee, isDAODeposit, isDAOWithdrawal, scriptEq, scriptIs, txSize } from "./utils";
 import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./chain_adapter";
-import { defaultCellDeps, defaultScript, getConfig, scriptNames } from "./config";
+import { defaultCellDeps, defaultScript, scriptNames } from "./config";
 
 export class TransactionBuilder {
     protected readonly accountLock: Script;
@@ -15,7 +15,9 @@ export class TransactionBuilder {
 
     protected readonly getHeaderByNumber: (blockNumber: Hexadecimal) => Promise<Header>;
 
-    protected readonly feeRate: BI
+    protected readonly feeRate: BI;
+
+    protected readonly padAllLockOccurrences: boolean;
 
     protected inputs: Cell[];
     protected outputs: Cell[];
@@ -25,6 +27,7 @@ export class TransactionBuilder {
         signer: (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>,
         getHeaderByNumber: (blockNumber: Hexadecimal) => Promise<Header> = getHeaderByNumber_,
         feeRate: BI = BI.from(1000),
+        padAllLockOccurrences: boolean = false//PW_LOCK compatibility
     ) {
         this.accountLock = accountLock;
         this.signer = signer;
@@ -32,6 +35,8 @@ export class TransactionBuilder {
         this.getHeaderByNumber = getHeaderByNumber;
 
         this.feeRate = feeRate;
+
+        this.padAllLockOccurrences = padAllLockOccurrences;
 
         this.inputs = [];
         this.outputs = [];
@@ -107,7 +112,7 @@ export class TransactionBuilder {
 
         transaction = await addInputSinces(transaction, async (c: Cell) => this.withdrawedDaoSince(c));
 
-        transaction = await addWitnessPlaceholders(transaction, this.accountLock, getBlockHash);
+        transaction = await addWitnessPlaceholders(transaction, this.accountLock, this.padAllLockOccurrences, getBlockHash);
 
         transaction = transaction.update(
             "fixedEntries", (e) => e.push(
@@ -246,16 +251,12 @@ async function addInputSinces(transaction: TransactionSkeletonType, withdrawedDa
     return transaction;
 }
 
-async function addWitnessPlaceholders(transaction: TransactionSkeletonType, accountLock: Script, blockNumber2BlockHash: (h: Hexadecimal) => Promise<Hexadecimal>) {
+async function addWitnessPlaceholders(transaction: TransactionSkeletonType, accountLock: Script, padAllLockOccurrences: boolean, blockNumber2BlockHash: (h: Hexadecimal) => Promise<Hexadecimal>) {
     if (transaction.witnesses.size !== 0) {
         throw new Error("This function can only be used on an empty witnesses structure.");
     }
 
-    let paddingCountDown = 1//Only first occurrence
-    const pwLock = "PW_LOCK$SECP256K1_BLAKE160";
-    if (pwLock in getConfig().SCRIPTS && scriptIs(accountLock, pwLock)) {
-        paddingCountDown = transaction.inputs.size;//All occurrences
-    }
+    let paddingCountDown = padAllLockOccurrences ? transaction.inputs.size : 1;
 
     for (const c of transaction.inputs) {
         const witnessArgs: WitnessArgs = { lock: "0x" };

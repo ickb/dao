@@ -6,9 +6,10 @@ export declare class TransactionBuilder {
     protected readonly signer: (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>;
     protected readonly getHeaderByNumber: (blockNumber: Hexadecimal) => Promise<Header>;
     protected readonly feeRate: BI;
+    protected readonly padAllLockOccurrences: boolean;
     protected inputs: Cell[];
     protected outputs: Cell[];
-    constructor(accountLock: Script, signer: (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>, getHeaderByNumber?: (blockNumber: Hexadecimal) => Promise<Header>, feeRate?: BI);
+    constructor(accountLock: Script, signer: (tx: TransactionSkeletonType, accountLock: Script) => Promise<Transaction>, getHeaderByNumber?: (blockNumber: Hexadecimal) => Promise<Header>, feeRate?: BI, padAllLockOccurrences?: boolean);
     add(source: "input" | "output", position: "start" | "end", ...cells: Cell[]): this;
     buildAndSend(secondsTimeout?: number): Promise<{
         transaction: import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>;
