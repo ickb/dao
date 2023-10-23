@@ -1,7 +1,8 @@
 import { getSyncedIndexer } from "./chain_adapter";
 import { TransactionBuilder } from "./domain_logic";
 import { CellCollector } from "@ckb-lumos/ckb-indexer";
-import { DAO_DEPOSIT_DATA, defaultScript } from "./utils";
+import { DAO_DEPOSIT_DATA } from "./utils";
+import { defaultScript } from "./config";
 
 export async function fund(transactionBuilder: TransactionBuilder) {
     const indexer = await getSyncedIndexer();

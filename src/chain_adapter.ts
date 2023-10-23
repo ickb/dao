@@ -1,9 +1,9 @@
 import { RPC } from "@ckb-lumos/rpc";
-import { Config, getConfig, initializeConfig, predefined } from "@ckb-lumos/config-manager/lib";
+import { Config, initializeConfig, predefined } from "@ckb-lumos/config-manager/lib";
 import { Indexer } from "@ckb-lumos/ckb-indexer";
 import { Mutex } from "./mutex";
 import { Header, Hexadecimal } from "@ckb-lumos/base";
-import { daoConfig, secp256k1Blake160Config } from "./config";
+import { addressPrefix, daoConfig, secp256k1Blake160Config } from "./config";
 
 const chain2RpcUrl = {
     mainnet: "https://rpc.ankr.com/nervos_ckb",
@@ -43,7 +43,7 @@ type ChainAdapter = {
     indexer: Indexer
 }
 
-let chainAdapter = newChainAdapter(getConfig().PREFIX == "ckb" ? "mainnet" : "testnet");
+let chainAdapter = newChainAdapter(addressPrefix() == "ckb" ? "mainnet" : "testnet");
 
 export async function initializeChainAdapter(chain: Chain, config?: Config, url: string = defaultRpcUrl(chain)) {
     if (chain != chainAdapter.chain || url !== chainAdapter.url) {

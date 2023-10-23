@@ -1,7 +1,11 @@
 import { TransactionBuilder } from "./domain_logic";
 import { ScriptConfig } from "@ckb-lumos/config-manager/lib";
-import { HashType, Hexadecimal, Script } from "@ckb-lumos/base";
+import { CellDep, HashType, Hexadecimal, Script } from "@ckb-lumos/base";
 export { getConfig, initializeConfig } from "@ckb-lumos/config-manager/lib";
+export declare function addressPrefix(): string;
+export declare function scriptNames(): string[];
+export declare function defaultScript(name: string): Script;
+export declare function defaultCellDeps(name: string): CellDep;
 export declare function secp256k1Blake160Config(): Promise<ScriptConfig>;
 export declare function daoConfig(): Promise<ScriptConfig>;
 export type ScriptData = {

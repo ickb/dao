@@ -1,14 +1,54 @@
 import { TransactionBuilder } from "./domain_logic";
 import { BI } from "@ckb-lumos/bi"
 import { ScriptConfig, ScriptConfigs, getConfig, initializeConfig, } from "@ckb-lumos/config-manager/lib";
-import { Cell, HashType, Hexadecimal, OutPoint, Script, blockchain } from "@ckb-lumos/base";
+import { Cell, CellDep, HashType, Hexadecimal, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { vector } from "@ckb-lumos/codec/lib/molecule";
 import { getRpc } from "./chain_adapter";
-import { defaultScript } from "./utils";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import { fund } from "./actions";
 
+//Try not to be over-reliant on getConfig as it may become an issue in the future. Use the provided abstractions.
 export { getConfig, initializeConfig } from "@ckb-lumos/config-manager/lib";
+
+export function addressPrefix() {
+    return getConfig().PREFIX;
+}
+
+export function scriptNames() {
+    const res: string[] = [];
+    for (const scriptName in getConfig().SCRIPTS) {
+        res.push(scriptName);
+    }
+    return res;
+}
+
+export function defaultScript(name: string): Script {
+    let configData = getConfig().SCRIPTS[name];
+    if (!configData) {
+        throw Error(name + " not found");
+    }
+
+    return {
+        codeHash: configData.CODE_HASH,
+        hashType: configData.HASH_TYPE,
+        args: "0x"
+    };
+}
+
+export function defaultCellDeps(name: string): CellDep {
+    let configData = getConfig().SCRIPTS[name];
+    if (!configData) {
+        throw Error(name + " not found");
+    }
+
+    return {
+        outPoint: {
+            txHash: configData.TX_HASH,
+            index: configData.INDEX,
+        },
+        depType: configData.DEP_TYPE,
+    };
+}
 
 async function getGenesisBlock() {
     return getRpc().getBlockByNumber("0x0");

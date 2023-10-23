@@ -1,36 +1,8 @@
 import { BI, BIish } from "@ckb-lumos/bi"
-import { Cell, CellDep, OutPoint, Script, blockchain } from "@ckb-lumos/base";
+import { Cell, OutPoint, Script, blockchain } from "@ckb-lumos/base";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { getRpc } from "./chain_adapter";
-import { getConfig } from "./config";
-
-export function defaultScript(name: string): Script {
-    let configData = getConfig().SCRIPTS[name];
-    if (!configData) {
-        throw Error(name + " not found");
-    }
-
-    return {
-        codeHash: configData.CODE_HASH,
-        hashType: configData.HASH_TYPE,
-        args: "0x"
-    };
-}
-
-export function defaultCellDeps(name: string): CellDep {
-    let configData = getConfig().SCRIPTS[name];
-    if (!configData) {
-        throw Error(name + " not found");
-    }
-
-    return {
-        outPoint: {
-            txHash: configData.TX_HASH,
-            index: configData.INDEX,
-        },
-        depType: configData.DEP_TYPE,
-    };
-}
+import { defaultScript } from "./config";
 
 export function scriptEq(s0: Script | undefined, s1: Script | undefined) {
     if (!s0 && !s1) {
