@@ -20,7 +20,7 @@ export declare class TransactionBuilder {
         transaction: import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>;
         fee: BI;
     }>;
-    protected buildWithChange(ckbDelta: BI): Promise<import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>>;
+    protected buildWithChange(ckbDelta: BI, ...changeCells: Cell[]): Promise<import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>>;
     getCkbDelta(): Promise<BI>;
     protected withdrawedDaoSince(c: Cell): Promise<BI>;
     getAccountLock(): Script;

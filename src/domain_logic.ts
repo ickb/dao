@@ -77,8 +77,7 @@ export class TransactionBuilder {
         return { transaction: await this.buildWithChange(ckbDelta.sub(fee)), fee };
     }
 
-    protected async buildWithChange(ckbDelta: BI) {
-        const changeCells: Cell[] = [];
+    protected async buildWithChange(ckbDelta: BI, ...changeCells: Cell[]) {
         if (ckbDelta.eq(0)) {
             //Do nothing
         } else {
@@ -153,7 +152,7 @@ export class TransactionBuilder {
     }
 
     getAccountLock(): Script {
-        return { ...this.accountLock }
+        return { ...this.accountLock };
     }
 }
 
