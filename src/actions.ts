@@ -1,53 +1,71 @@
-import { getSyncedIndexer } from "./chain_adapter";
+import { getRpc, getSyncedIndexer } from "./chain_adapter";
 import { TransactionBuilder } from "./domain_logic";
 import { CellCollector } from "@ckb-lumos/ckb-indexer";
-import { DAO_DEPOSIT_DATA } from "./utils";
+import { DAO_DEPOSIT_DATA, epochCompare, parseEpoch } from "./utils";
 import { defaultScript } from "./config";
 
-export async function fund(transactionBuilder: TransactionBuilder) {
+export async function fund(transactionBuilder: TransactionBuilder): Promise<TransactionBuilder> {
+    const is_well_funded = async function () {
+        try {
+            await transactionBuilder.toTransactionSkeleton()
+            return true;
+        } catch (e: any) {
+            //Improve error typing or define this function on builder itself/////////////////////////////////////////
+            if (e.message === "Missing CKB: not enough funds to execute the transaction") {
+                return false;
+            }
+            throw e;
+        }
+    }
+
+    if (await is_well_funded()) {
+        return transactionBuilder;
+    }
+
     const indexer = await getSyncedIndexer();
 
-    const collector = new CellCollector(indexer, {
+    //Try adding dao withdrawal requests
+    const tipEpoch = parseEpoch((await getRpc().getTipHeader()).epoch);
+    for await (const cell of new CellCollector(indexer, {
+        scriptSearchMode: "exact",
+        withData: true,
+        type: defaultScript("DAO"),
+        lock: transactionBuilder.getAccountLock()
+    }).collect()) {
+        if (cell.data === DAO_DEPOSIT_DATA) {
+            continue;//Not a withdrawal request
+        }
+
+        const maturityEpoch = parseEpoch(await transactionBuilder.withdrawedDaoSince(cell));
+        if (epochCompare(maturityEpoch, tipEpoch) === 1) {
+            continue;//Not yet ripe
+        }
+
+        transactionBuilder.add("input", "end", cell);
+
+        if (await is_well_funded()) {
+            return transactionBuilder;
+        }
+    }
+
+    //Try adding capacity cells
+    for await (const cell of new CellCollector(indexer, {
         scriptSearchMode: "exact",
         withData: true,
         type: "empty",
         lock: transactionBuilder.getAccountLock()
-    });
-
-    for await (const cell of collector.collect()) {
+    }).collect()) {
         if (cell.data !== "0x") {
             continue;
         }
 
         transactionBuilder.add("input", "end", cell);
-        try {
-            transactionBuilder.toTransactionSkeleton()
-        } catch {
-            continue;
+
+        if (await is_well_funded()) {
+            return transactionBuilder;
         }
-        return transactionBuilder;
     }
 
-    throw Error("Not enough funds to cover the output cells occupied capacity");
-}
-
-export async function daoWithdrawAll(transactionBuilder: TransactionBuilder) {
-    const indexer = await getSyncedIndexer();
-
-    const collector = new CellCollector(indexer, {
-        scriptSearchMode: "exact",
-        withData: true,
-        type: defaultScript("DAO"),
-        lock: transactionBuilder.getAccountLock()
-    });
-
-    for await (const cell of collector.collect()) {
-        if (cell.data === DAO_DEPOSIT_DATA) {
-            continue;
-        }
-
-        transactionBuilder.add("input", "end", cell);
-    }
-
-    return transactionBuilder;
+    await transactionBuilder.toTransactionSkeleton();//Bubble up error
+    return transactionBuilder;//Not gonna execute
 }

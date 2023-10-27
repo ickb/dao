@@ -5,7 +5,7 @@ import { bytes } from "@ckb-lumos/codec";
 import { Cell, CellDep, Header, Hexadecimal, Script, Transaction, WitnessArgs, blockchain } from "@ckb-lumos/base";
 import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible } from "@ckb-lumos/common-scripts/lib/dao";
 import { Uint64LE } from "@ckb-lumos/codec/lib/number/uint";
-import { calculateFee, isDAODeposit, isDAOWithdrawal, scriptEq, scriptIs, txSize } from "./utils";
+import { calculateFee, isDAODeposit, isDAOWithdrawal, scriptEq, txSize } from "./utils";
 import { getRpc, getHeaderByNumber as getHeaderByNumber_ } from "./chain_adapter";
 import { defaultCellDeps, defaultScript, scriptNames } from "./config";
 
@@ -77,29 +77,14 @@ export class TransactionBuilder {
     async toTransactionSkeleton() {
         const ckbDelta = await this.getCkbDelta();
 
-        const fee = calculateFee(txSize(await this.buildWithChange(ckbDelta)), this.feeRate);
+        const fee = calculateFee(txSize(await this.build(ckbDelta)), this.feeRate);
 
-        return { transaction: await this.buildWithChange(ckbDelta.sub(fee)), fee };
+        return { transaction: await this.build(ckbDelta.sub(fee)), fee };
     }
 
-    protected async buildWithChange(ckbDelta: BI, ...changeCells: Cell[]) {
-        if (ckbDelta.eq(0)) {
-            //Do nothing
-        } else {
-            const changeCell = {
-                cellOutput: {
-                    capacity: ckbDelta.toHexString(),
-                    lock: this.accountLock,
-                    type: undefined,
-                },
-                data: "0x"
-            }
-            changeCells.push(changeCell);
-            const minimalCapacity = minimalCellCapacityCompatible(changeCell, { validate: false });
-            if (!ckbDelta.gte(minimalCapacity)) {
-                throw Error("Not enough funds to execute the transaction");
-            }
-        }
+    protected async build(ckbDelta: BI) {
+        const changeCells = await this.toChange(ckbDelta);
+
         let transaction = TransactionSkeleton();
         transaction = transaction.update("inputs", (i) => i.push(...this.inputs));
         transaction = transaction.update("outputs", (o) => o.push(...this.outputs, ...changeCells));
@@ -126,6 +111,30 @@ export class TransactionBuilder {
         return transaction;
     }
 
+    async toChange(ckbDelta: BI, changeCells: Cell[] = []) {
+        if (ckbDelta.lt(0)) {
+            throw Error("Missing CKB: not enough funds to execute the transaction");
+        } else if (ckbDelta.eq(0)) {
+            //Do nothing
+        } else {
+            const changeCell = {
+                cellOutput: {
+                    capacity: ckbDelta.toHexString(),
+                    lock: this.accountLock,
+                    type: undefined,
+                },
+                data: "0x"
+            }
+            changeCells.push(changeCell);
+            const minimalCapacity = minimalCellCapacityCompatible(changeCell, { validate: false });
+            if (ckbDelta.lt(minimalCapacity)) {
+                throw Error("Missing CKB: not enough funds to execute the transaction");
+            }
+        }
+
+        return changeCells;
+    }
+
     async getCkbDelta() {
         let ckbDelta = BI.from(0);
         for (const c of this.inputs) {
@@ -145,7 +154,7 @@ export class TransactionBuilder {
         return ckbDelta;
     }
 
-    protected async withdrawedDaoSince(c: Cell) {
+    async withdrawedDaoSince(c: Cell) {
         if (!isDAOWithdrawal(c)) {
             throw Error("Not a withdrawed dao cell")
         }
@@ -167,13 +176,13 @@ function addCellDeps(transaction: TransactionSkeletonType) {
     }
 
     const prefix2Name: Map<string, string> = new Map();
-    for (const scriptName in scriptNames()) {
+    for (const scriptName of scriptNames()) {
         prefix2Name.set(scriptName.split("$")[0], scriptName);
     }
 
     const serializeScript = (s: Script) => `${s.codeHash}-${s.hashType}`
     const serializedScript2CellDeps: Map<string, CellDep[]> = new Map();
-    for (const scriptName in scriptNames()) {
+    for (const scriptName of scriptNames()) {
         const s = defaultScript(scriptName);
         const cellDeps: CellDep[] = [];
         for (const prefix of scriptName.split("$")) {

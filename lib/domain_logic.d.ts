@@ -21,9 +21,10 @@ export declare class TransactionBuilder {
         transaction: import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>;
         fee: BI;
     }>;
-    protected buildWithChange(ckbDelta: BI, ...changeCells: Cell[]): Promise<import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>>;
+    protected build(ckbDelta: BI): Promise<import("immutable").Record<import("@ckb-lumos/helpers").TransactionSkeletonInterface> & Readonly<import("@ckb-lumos/helpers").TransactionSkeletonInterface>>;
+    toChange(ckbDelta: BI, changeCells?: Cell[]): Promise<Cell[]>;
     getCkbDelta(): Promise<BI>;
-    protected withdrawedDaoSince(c: Cell): Promise<BI>;
+    withdrawedDaoSince(c: Cell): Promise<BI>;
     getAccountLock(): Script;
 }
 //# sourceMappingURL=domain_logic.d.ts.map
