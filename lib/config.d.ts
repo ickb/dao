@@ -8,7 +8,7 @@ export declare function defaultScript(name: string): Script;
 export declare function defaultCellDeps(name: string): CellDep;
 export declare function secp256k1Blake160Config(): Promise<ScriptConfig>;
 export declare function daoConfig(): Promise<ScriptConfig>;
-export type ScriptData = {
+export declare type ScriptData = {
     name: string;
     hexData: Hexadecimal;
     codeHash: Hexadecimal;

@@ -6,7 +6,7 @@ export declare function scriptIs(s0: Script, name: string): boolean;
 export declare const DAO_DEPOSIT_DATA = "0x0000000000000000";
 export declare function isDAODeposit(c: Cell): boolean;
 export declare function isDAOWithdrawal(c: Cell): boolean;
-export type Epoch = {
+export declare type Epoch = {
     length: BI;
     index: BI;
     number: BI;

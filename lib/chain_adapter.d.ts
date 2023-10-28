@@ -7,7 +7,7 @@ declare const chain2RpcUrl: {
     testnet: string;
     devnet: string;
 };
-export type Chain = keyof typeof chain2RpcUrl;
+export declare type Chain = keyof typeof chain2RpcUrl;
 export declare function isChain(x: string): x is Chain;
 export declare function defaultRpcUrl(chain: Chain): string;
 export declare function initializeChainAdapter(chain: Chain, config?: Config, url?: string): Promise<void>;

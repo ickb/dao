@@ -67,15 +67,17 @@ export class TransactionBuilder {
     async buildAndSend(secondsTimeout: number = 600) {
         const { transaction, fee } = await this.toTransactionSkeleton();
 
+        // console.log(JSON.stringify(transaction, null, 2));/////////////////////////////////////
+
         const signedTransaction = await this.signer(transaction, this.accountLock);
 
-        const txHash = await sendTransaction(signedTransaction, getRpc(), secondsTimeout);
+        const txHash = await this.sendTransaction(signedTransaction, secondsTimeout);
 
         return { transaction, fee, signedTransaction, txHash }
     }
 
     async toTransactionSkeleton() {
-        const ckbDelta = await this.getCkbDelta();
+        const ckbDelta = await this.getCkbDelta(this.inputs, this.outputs);
 
         const fee = calculateFee(txSize(await this.build(ckbDelta)), this.feeRate);
 
@@ -89,15 +91,15 @@ export class TransactionBuilder {
         transaction = transaction.update("inputs", (i) => i.push(...this.inputs));
         transaction = transaction.update("outputs", (o) => o.push(...this.outputs, ...changeCells));
 
-        transaction = addCellDeps(transaction);
+        //Add sanity check////////////////////////////////////////////////////////
 
-        const getBlockHash = async (blockNumber: Hexadecimal) => (await this.getHeaderByNumber(blockNumber)).hash;
+        transaction = this.addCellDeps(transaction);
 
-        transaction = await addHeaderDeps(transaction, getBlockHash);
+        transaction = await this.addHeaderDeps(transaction);
 
-        transaction = await addInputSinces(transaction, async (c: Cell) => this.withdrawedDaoSince(c));
+        transaction = await this.addInputSinces(transaction);
 
-        transaction = await addWitnessPlaceholders(transaction, this.accountLock, this.padAllLockOccurrences, getBlockHash);
+        transaction = await this.addWitnessPlaceholders(transaction);
 
         transaction = transaction.update(
             "fixedEntries", (e) => e.push(
@@ -111,7 +113,7 @@ export class TransactionBuilder {
         return transaction;
     }
 
-    async toChange(ckbDelta: BI, changeCells: Cell[] = []) {
+    protected async toChange(ckbDelta: BI, changeCells: Cell[] = []) {
         if (ckbDelta.lt(0)) {
             throw Error("Missing CKB: not enough funds to execute the transaction");
         } else if (ckbDelta.eq(0)) {
@@ -135,11 +137,11 @@ export class TransactionBuilder {
         return changeCells;
     }
 
-    async getCkbDelta() {
+    async getCkbDelta(inputs: Cell[] = this.inputs, outputs: Cell[] = this.outputs) {
         let ckbDelta = BI.from(0);
-        for (const c of this.inputs) {
+        for (const c of inputs) {
             //Second Withdrawal step from NervosDAO
-            if (isDAODeposit(c)) {
+            if (isDAOWithdrawal(c)) {
                 const depositHeader = await this.getHeaderByNumber(Uint64LE.unpack(c.data).toHexString());
                 const withdrawalHeader = await this.getHeaderByNumber(c.blockNumber!);
                 const maxWithdrawable = calculateMaximumWithdrawCompatible(c, depositHeader.dao, withdrawalHeader.dao)
@@ -149,7 +151,7 @@ export class TransactionBuilder {
             }
         }
 
-        this.outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
+        outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
 
         return ckbDelta;
     }
@@ -168,147 +170,160 @@ export class TransactionBuilder {
     getAccountLock(): Script {
         return { ...this.accountLock };
     }
-}
 
-function addCellDeps(transaction: TransactionSkeletonType) {
-    if (transaction.cellDeps.size !== 0) {
-        throw new Error("This function can only be used on an empty cell deps structure.");
-    }
-
-    const prefix2Name: Map<string, string> = new Map();
-    for (const scriptName of scriptNames()) {
-        prefix2Name.set(scriptName.split("$")[0], scriptName);
-    }
-
-    const serializeScript = (s: Script) => `${s.codeHash}-${s.hashType}`
-    const serializedScript2CellDeps: Map<string, CellDep[]> = new Map();
-    for (const scriptName of scriptNames()) {
-        const s = defaultScript(scriptName);
-        const cellDeps: CellDep[] = [];
-        for (const prefix of scriptName.split("$")) {
-            cellDeps.push(defaultCellDeps(prefix2Name.get(prefix)!));
-        }
-        serializedScript2CellDeps.set(serializeScript(s), cellDeps);
-    }
-
-    const scripts: Script[] = [];
-    for (const c of transaction.inputs) {
-        scripts.push(c.cellOutput.lock)
-    }
-    for (const c of [...transaction.outputs, ...transaction.inputs]) {
-        if (c.cellOutput.type) {
-            scripts.push(c.cellOutput.type)
-        }
-    }
-
-    const serializeCellDep = (d: CellDep) => `${d.outPoint.txHash}-${d.outPoint.index}-${d.depType}`;
-    const serializedCellDep2CellDep: Map<string, CellDep> = new Map();
-    for (const script of scripts) {
-        const cellDeps = serializedScript2CellDeps.get(serializeScript(script));
-        if (cellDeps === undefined) {
-            throw Error("CellDep not found for script " + String(script));
-        }
-        for (const cellDep of cellDeps) {
-            serializedCellDep2CellDep.set(serializeCellDep(cellDep), cellDep);
-        }
-    }
-
-    return transaction.update("cellDeps", (cellDeps) => cellDeps.push(...serializedCellDep2CellDep.values()));
-}
-
-async function addHeaderDeps(transaction: TransactionSkeletonType, blockNumber2BlockHash: (h: Hexadecimal) => Promise<Hexadecimal>) {
-    if (transaction.headerDeps.size !== 0) {
-        throw new Error("This function can only be used on an empty header deps structure.");
-    }
-
-    const uniqueBlockHashes: Set<string> = new Set();
-    for (const c of transaction.inputs) {
-        if (!c.blockNumber) {
-            throw Error("Cell must have blockNumber populated");
+    protected addCellDeps(transaction: TransactionSkeletonType) {
+        if (transaction.cellDeps.size !== 0) {
+            throw new Error("This function can only be used on an empty cell deps structure.");
         }
 
-        if (isDAODeposit(c)) {
-            uniqueBlockHashes.add(await blockNumber2BlockHash(c.blockNumber));
-            continue;
+        const prefix2Name: Map<string, string> = new Map();
+        for (const scriptName of scriptNames()) {
+            prefix2Name.set(scriptName.split("$")[0], scriptName);
         }
 
-        if (isDAOWithdrawal(c)) {
-            uniqueBlockHashes.add(await blockNumber2BlockHash(c.blockNumber));
-            uniqueBlockHashes.add(await blockNumber2BlockHash(Uint64LE.unpack(c.data).toHexString()));
-        }
-    }
-
-    transaction = transaction.update("headerDeps", (h) => h.push(...uniqueBlockHashes.keys()));
-
-    return transaction;
-}
-
-async function addInputSinces(transaction: TransactionSkeletonType, withdrawedDaoSince: (c: Cell) => Promise<BI>) {
-    if (transaction.inputSinces.size !== 0) {
-        throw new Error("This function can only be used on an empty input sinces structure.");
-    }
-
-    for (const [index, c] of transaction.inputs.entries()) {
-        if (isDAOWithdrawal(c)) {
-            const since = await withdrawedDaoSince(c);
-            transaction = transaction.update("inputSinces", (inputSinces) => {
-                return inputSinces.set(index, since.toHexString());
-            });
-        }
-    }
-
-    return transaction;
-}
-
-async function addWitnessPlaceholders(transaction: TransactionSkeletonType, accountLock: Script, padAllLockOccurrences: boolean, blockNumber2BlockHash: (h: Hexadecimal) => Promise<Hexadecimal>) {
-    if (transaction.witnesses.size !== 0) {
-        throw new Error("This function can only be used on an empty witnesses structure.");
-    }
-
-    let paddingCountDown = padAllLockOccurrences ? transaction.inputs.size : 1;
-
-    for (const c of transaction.inputs) {
-        const witnessArgs: WitnessArgs = { lock: "0x" };
-
-        if (paddingCountDown > 0 && scriptEq(c.cellOutput.lock, accountLock)) {
-            witnessArgs.lock = "0x" + "00".repeat(65);
-            paddingCountDown -= 1;
-        }
-
-        if (isDAODeposit(c)) {
-            const blockHash = await blockNumber2BlockHash(Uint64LE.unpack(c.data).toHexString());
-            const headerDepIndex = transaction.headerDeps.findIndex((v) => v == blockHash);
-            if (headerDepIndex === -1) {
-                throw Error("Block hash not found in Header Dependencies")
+        const serializeScript = (s: Script) => `${s.codeHash}-${s.hashType}`
+        const serializedScript2CellDeps: Map<string, CellDep[]> = new Map();
+        for (const scriptName of scriptNames()) {
+            const s = defaultScript(scriptName);
+            const cellDeps: CellDep[] = [];
+            for (const prefix of scriptName.split("$")) {
+                cellDeps.push(defaultCellDeps(prefix2Name.get(prefix)!));
             }
-            witnessArgs.inputType = bytes.hexify(Uint64LE.pack(headerDepIndex));
+            serializedScript2CellDeps.set(serializeScript(s), cellDeps);
         }
 
-        const packedWitness = bytes.hexify(blockchain.WitnessArgs.pack(witnessArgs));
-        transaction = transaction.update("witnesses", (w) => w.push(packedWitness));
-    }
-
-    return transaction;
-}
-
-async function sendTransaction(signedTransaction: Transaction, rpc: RPC, secondsTimeout: number) {
-    //Send the transaction
-    const txHash = await rpc.sendTransaction(signedTransaction);
-
-    //Wait until the transaction is committed or time out after ten minutes
-    for (let i = 0; i < secondsTimeout; i++) {
-        let transactionData = await rpc.getTransaction(txHash);
-        switch (transactionData.txStatus.status) {
-            case "committed":
-                return txHash;
-            case "pending":
-            case "proposed":
-                await new Promise(r => setTimeout(r, 1000));
-                break;
-            default:
-                throw new Error("Unexpected transaction state: " + transactionData.txStatus.status);
+        const scripts: Script[] = [];
+        for (const c of transaction.inputs) {
+            scripts.push(c.cellOutput.lock)
         }
+        for (const c of [...transaction.outputs, ...transaction.inputs]) {
+            if (c.cellOutput.type) {
+                scripts.push(c.cellOutput.type)
+            }
+        }
+
+        const serializeCellDep = (d: CellDep) => `${d.outPoint.txHash}-${d.outPoint.index}-${d.depType}`;
+        const serializedCellDep2CellDep: Map<string, CellDep> = new Map();
+        for (const script of scripts) {
+            const cellDeps = serializedScript2CellDeps.get(serializeScript(script));
+            if (cellDeps === undefined) {
+                throw Error("CellDep not found for script " + String(script));
+            }
+            for (const cellDep of cellDeps) {
+                serializedCellDep2CellDep.set(serializeCellDep(cellDep), cellDep);
+            }
+        }
+
+        return transaction.update("cellDeps", (cellDeps) => cellDeps.push(...serializedCellDep2CellDep.values()));
     }
 
-    throw new Error("Transaction timed out, 10 minutes elapsed from submission.");
+    protected async addHeaderDeps(transaction: TransactionSkeletonType) {
+        if (transaction.headerDeps.size !== 0) {
+            throw new Error("This function can only be used on an empty header deps structure.");
+        }
+
+        const uniqueBlockHashes: Set<string> = new Set();
+        for (const blockNumber of await this.getHeaderDepsBlockNumbers(transaction)) {
+            const header = await this.getHeaderByNumber(blockNumber);
+            uniqueBlockHashes.add(header.hash);
+        }
+
+        transaction = transaction.update("headerDeps", (h) => h.push(...uniqueBlockHashes.keys()));
+
+        return transaction;
+    }
+
+    protected async getHeaderDepsBlockNumbers(transaction: TransactionSkeletonType): Promise<Hexadecimal[]> {
+        const blockNumbers: Hexadecimal[] = [];
+        for (const c of transaction.inputs) {
+            if (!c.blockNumber) {
+                throw Error("Cell must have blockNumber populated");
+            }
+
+            if (isDAODeposit(c)) {
+                blockNumbers.push(c.blockNumber);
+                continue;
+            }
+
+            if (isDAOWithdrawal(c)) {
+                blockNumbers.push(c.blockNumber);
+                blockNumbers.push(Uint64LE.unpack(c.data).toHexString());
+            }
+        }
+        return blockNumbers;
+    }
+
+
+    protected async addInputSinces(transaction: TransactionSkeletonType) {
+        if (transaction.inputSinces.size !== 0) {
+            throw new Error("This function can only be used on an empty input sinces structure.");
+        }
+
+        for (const [index, c] of transaction.inputs.entries()) {
+            if (isDAOWithdrawal(c)) {
+                const since = await this.withdrawedDaoSince(c);
+                transaction = transaction.update("inputSinces", (inputSinces) => {
+                    return inputSinces.set(index, since.toHexString());
+                });
+            }
+        }
+
+        return transaction;
+    }
+
+    protected async addWitnessPlaceholders(transaction: TransactionSkeletonType) {
+        if (transaction.witnesses.size !== 0) {
+            throw new Error("This function can only be used on an empty witnesses structure.");
+        }
+
+        let paddingCountDown = this.padAllLockOccurrences ? transaction.inputs.size : 1;
+
+        for (const c of transaction.inputs) {
+            const witnessArgs: WitnessArgs = { lock: "0x" };
+
+            if (paddingCountDown > 0 && scriptEq(c.cellOutput.lock, this.accountLock)) {
+                witnessArgs.lock = "0x" + "00".repeat(65);
+                paddingCountDown -= 1;
+            }
+
+            if (isDAOWithdrawal(c)) {
+                const header = await this.getHeaderByNumber(Uint64LE.unpack(c.data).toHexString());
+                const blockHash = header.hash;
+                const headerDepIndex = transaction.headerDeps.findIndex((v) => v == blockHash);
+                if (headerDepIndex === -1) {
+                    throw Error("Block hash not found in Header Dependencies")
+                }
+                witnessArgs.inputType = bytes.hexify(Uint64LE.pack(headerDepIndex));
+            }
+
+            const packedWitness = bytes.hexify(blockchain.WitnessArgs.pack(witnessArgs));
+            transaction = transaction.update("witnesses", (w) => w.push(packedWitness));
+        }
+
+        return transaction;
+    }
+
+    protected async sendTransaction(signedTransaction: Transaction, secondsTimeout: number) {
+        const rpc = getRpc();
+
+        //Send the transaction
+        const txHash = await rpc.sendTransaction(signedTransaction);
+
+        //Wait until the transaction is committed or time out after ten minutes
+        for (let i = 0; i < secondsTimeout; i++) {
+            let transactionData = await rpc.getTransaction(txHash);
+            switch (transactionData.txStatus.status) {
+                case "committed":
+                    return txHash;
+                case "pending":
+                case "proposed":
+                    await new Promise(r => setTimeout(r, 1000));
+                    break;
+                default:
+                    throw new Error("Unexpected transaction state: " + transactionData.txStatus.status);
+            }
+        }
+
+        throw new Error("Transaction timed out, 10 minutes elapsed from submission.");
+    }
 }
