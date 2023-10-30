@@ -3,9 +3,11 @@ import { TransactionBuilder } from "./domain_logic";
 import { CellCollector } from "@ckb-lumos/ckb-indexer";
 import { DAO_DEPOSIT_DATA, epochCompare, parseEpoch } from "./utils";
 import { defaultScript } from "./config";
+import { Header } from "@ckb-lumos/base";
 
-export async function fund(transactionBuilder: TransactionBuilder): Promise<TransactionBuilder> {
-    const is_well_funded = async function () {
+export async function fund(transactionBuilder: TransactionBuilder, addAll: boolean = false, tipHeader?: Header): Promise<TransactionBuilder> {
+    tipHeader = tipHeader ?? await getRpc().getTipHeader();
+    const is_well_funded = addAll ? async () => false : async () => {
         try {
             await transactionBuilder.toTransactionSkeleton()
             return true;
