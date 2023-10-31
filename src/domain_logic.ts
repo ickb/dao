@@ -19,8 +19,9 @@ export class TransactionBuilder {
 
     protected readonly padAllLockOccurrences: boolean;
 
-    protected inputs: Cell[];
-    protected outputs: Cell[];
+    //Make builder immutable and transform this in transactionSkeleton
+    inputs: Cell[];
+    outputs: Cell[];
 
     constructor(
         accountLock: Script,
