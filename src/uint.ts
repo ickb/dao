@@ -2,7 +2,7 @@
 // https://raw.githubusercontent.com/ckb-js/lumos/develop/packages/codec/src/number/uint.ts
 
 import { BI, BIish } from "@ckb-lumos/bi";
-import { createFixedBytesCodec } from "@ckb-lumos/codec/lib/base";
+import { FixedBytesCodec, createFixedBytesCodec } from "@ckb-lumos/codec/lib/base";
 import { CodecBaseParseError } from "@ckb-lumos/codec/lib/error";
 
 
@@ -75,3 +75,13 @@ export const createUintBICodec = (byteLength: number, littleEndian = false) => {
         },
     });
 };
+
+// Additional codecs
+
+export const BooleanCodec = createFixedBytesCodec<boolean>(
+    {
+        byteLength: 1,
+        pack: (packable) => new Uint8Array([packable ? 1 : 0]),
+        unpack: (unpackable) => unpackable.at(0)! === 0 ? false : true,
+    },
+);
