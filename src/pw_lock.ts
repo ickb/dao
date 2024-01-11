@@ -3,7 +3,7 @@ import { bytes } from "@ckb-lumos/codec";
 import { Cell, blockchain } from "@ckb-lumos/base";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { createP2PKHMessageGroup } from "@ckb-lumos/common-scripts";
-import { I8Cell, I8Script, scriptEq, witness } from "./cell";
+import { I8Script, scriptEq, witness } from "./cell";
 import { defaultScript } from "./config";
 
 export interface EthereumRpc {
@@ -24,31 +24,18 @@ export function getEthereumProvider() {
     return window.ethereum as EthereumProvider;
 }
 
-export function pwlockSifter(inputs: Iterable<Cell>, ethereumAddress: string) {
-    const owned: I8Cell[] = [];
-    const unknowns: Cell[] = [];
-
-    const accountLock = I8Script.from({
-        ...defaultScript("PW_LOCK"),
-        args: ethereumAddress,
-        [witness]: "0x" + "00".repeat(65)
-    });
-
-    for (const c of inputs) {
-        if (!scriptEq(c.cellOutput.lock, accountLock)) {
-            unknowns.push(c);
-            continue;
-        }
-
-        owned.push(I8Cell.from({ ...c, lock: accountLock }));
+export function pwLockExpander(c: Cell) {
+    const accountLock = getAccountPwLock();
+    if (!scriptEq(c.cellOutput.lock, accountLock)) {
+        return undefined;
     }
 
-    return { owned, unknowns };
+    return accountLock;
 }
 
-export async function pwlockSigner(transaction: TransactionSkeletonType, ethereumAddress: string) {
+export async function pwLockSigner(transaction: TransactionSkeletonType) {
     // just like P2PKH: https://github.com/nervosnetwork/ckb-system-scripts/wiki/How-to-sign-transaction
-    const accountLock = { ...defaultScript("PW_LOCK"), args: ethereumAddress };
+    const accountLock = getAccountPwLock();
 
     const keccak = createKeccak("keccak256");
 
@@ -83,3 +70,11 @@ export async function pwlockSigner(transaction: TransactionSkeletonType, ethereu
 
     return createTransactionFromSkeleton(transaction);
 }
+
+export function getAccountPwLock() {
+    return I8Script.from({
+        ...defaultScript("PW_LOCK"),
+        args: getEthereumProvider().selectedAddress,
+        [witness]: "0x" + "00".repeat(65)
+    });
+};

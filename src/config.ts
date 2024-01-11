@@ -5,7 +5,7 @@ import {
     Config, ScriptConfigs, ScriptConfig, generateGenesisScriptConfigs,
     predefined, getConfig, initializeConfig as unadaptedInitializeConfig
 } from "@ckb-lumos/config-manager/lib";
-import { I8Cell, I8Script, I8OutPoint, I8Header, scriptEq, I8CellDep, cellDeps } from "./cell";
+import { I8Cell, I8Script, I8OutPoint, I8Header, scriptEq, I8CellDep, cellDeps, i8ScriptPadding } from "./cell";
 import { LightClientRPC } from "@ckb-lumos/light-client";
 import { RPC } from "@ckb-lumos/rpc";
 import { CKBComponents } from "@ckb-lumos/rpc/lib/types/api";
@@ -128,10 +128,10 @@ export function scriptConfigAdapterFrom(scriptConfig: ScriptConfig): ScriptConfi
     })
 
     return new ScriptConfigAdapter(I8Script.from({
+        ...i8ScriptPadding,
         codeHash: scriptConfig.CODE_HASH,
         hashType: scriptConfig.HASH_TYPE,
-        args: "0x",
-        [cellDeps]: Object.freeze([dep])
+        [cellDeps]: [dep]
     }));
 }
 
@@ -185,10 +185,10 @@ export async function deploy(
     const oldConfig = getConfig();
     Array.from(scriptData).forEach(({ name, codeHash, hashType }, i) => {
         newScriptConfig[name] = new ScriptConfigAdapter(I8Script.from({
+            ...i8ScriptPadding,
             codeHash,
             hashType,
-            args: "0x",
-            [cellDeps]: Object.freeze([I8CellDep.from({ outPoint: outPoints[i], depType: "code" })])
+            [cellDeps]: [I8CellDep.from({ outPoint: outPoints[i], depType: "code" })]
         }))
     });
 
@@ -246,7 +246,7 @@ export async function createDepGroup(
         newScriptConfig[name] = new ScriptConfigAdapter(
             I8Script.from({
                 ...s,
-                [cellDeps]: Object.freeze([I8CellDep.from({ outPoint, depType: "depGroup" })])
+                [cellDeps]: [I8CellDep.from({ outPoint, depType: "depGroup" })]
             })
         );
     }

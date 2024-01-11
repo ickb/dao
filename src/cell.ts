@@ -8,6 +8,37 @@ import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import { EpochSinceValue } from "@ckb-lumos/base/lib/since";
 import { CellOutput } from "@ckb-lumos/ckb-indexer/lib/indexerType";
 
+export function capacitiesSifter(
+    inputs: Iterable<Cell>,
+    accountLockExpander: (c: Cell) => I8Script | undefined
+) {
+    const owned: I8Cell[] = [];
+    const unknowns: Cell[] = [];
+
+    for (const c of inputs) {
+        if (c.cellOutput.type !== undefined || c.data !== "0x") {
+            unknowns.push(c);
+            continue;
+        }
+
+        const lock = accountLockExpander(c);
+        if (!lock) {
+            unknowns.push(c);
+            continue;
+        }
+
+        owned.push(I8Cell.from({
+            ...c,
+            cellOutput: {
+                lock,
+                capacity: c.cellOutput.capacity
+            }
+        }));
+    }
+
+    return { owned, unknowns };
+}
+
 export const errorBothScriptUndefined = "Comparing two Scripts that both are undefined";
 export function scriptEq(s0: Script | undefined, s1: Script | undefined) {
     if (!s0 && !s1) {
@@ -66,10 +97,6 @@ export function epochSinceAdd(e: EpochSinceValue, delta: EpochSinceValue): Epoch
     return { length, index, number };
 }
 
-export function isCapacity(c: Cell) {
-    return c.cellOutput.type === undefined && c.data === "0x";
-}
-
 //Declarations of immutable data structures
 export const immutable = Symbol("immutable");
 export const cellDeps = Symbol("cellDeps");
@@ -77,6 +104,7 @@ export const headerDeps = Symbol("headerDeps");
 export const witness = Symbol("witness");
 export const since = Symbol("since");
 
+export interface I8Scriptable extends Omit<I8Script, typeof immutable> { };
 export class I8Script implements Script {
     readonly [immutable] = true
     readonly codeHash: Hash;
@@ -85,20 +113,29 @@ export class I8Script implements Script {
 
     readonly [cellDeps]: readonly I8CellDep[];
     readonly [headerDeps]: readonly I8Header[];
-    readonly [witness]?: HexString;
-    readonly [since]?: PackedSince;
-    private constructor(i: Script & Partial<I8Script>) {
+    readonly [witness]: HexString | undefined;
+    readonly [since]: PackedSince;
+    private constructor(i: I8Scriptable) {
         this.codeHash = i.codeHash;
         this.hashType = i.hashType;
         this.args = i.args;
 
-        this[cellDeps] = Object.freeze(i[cellDeps] ?? []);
-        this[headerDeps] = Object.freeze(i[headerDeps] ?? []);
+        this[cellDeps] = Object.freeze(i[cellDeps]);
+        this[headerDeps] = Object.freeze(i[headerDeps]);
         this[witness] = i[witness];
         this[since] = i[since];
     }
-    static from(i: Script & Partial<I8Script>) { return Object.freeze(i instanceof I8Script ? i : new I8Script(i)); }
+    static from(i: I8Scriptable) { return Object.freeze(i instanceof I8Script ? i : new I8Script(i)); }
 }
+export const i8ScriptPadding = I8Script.from({
+    codeHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+    hashType: "data",
+    args: "0x",
+    [cellDeps]: [],
+    [headerDeps]: [],
+    [witness]: undefined,
+    [since]: "0x0",
+});
 
 export class I8OutPoint implements OutPoint {
     readonly [immutable] = true
@@ -111,20 +148,27 @@ export class I8OutPoint implements OutPoint {
     static from(i: OutPoint) { return Object.freeze(i instanceof I8OutPoint ? i : new I8OutPoint(i)); }
 }
 
-export class I8CellOutput implements CellOutput {
+export interface I8CellOutputable extends CellOutput {
+    lock: I8Scriptable;
+    type?: I8Scriptable;
+};
+export class I8CellOutput implements I8CellOutputable {
     readonly [immutable] = true
     readonly capacity: HexNumber;
     readonly lock: I8Script;
     readonly type?: I8Script;
-    private constructor(i: CellOutput) {
+    private constructor(i: I8CellOutputable) {
         this.capacity = i.capacity;
         this.lock = I8Script.from(i.lock);
         this.type = i.type ? I8Script.from(i.type) : undefined;
     }
-    static from(i: CellOutput) { return Object.freeze(i instanceof I8CellOutput ? i : new I8CellOutput(i)); }
+    static from(i: I8CellOutputable) { return Object.freeze(i instanceof I8CellOutput ? i : new I8CellOutput(i)); }
 }
 
-export class I8Cell implements Cell {
+export interface I8Cellable extends Cell {
+    cellOutput: I8CellOutputable
+}
+export class I8Cell implements I8Cellable {
     readonly [immutable] = true
     readonly cellOutput: I8CellOutput;
     readonly data: HexString;
@@ -132,13 +176,9 @@ export class I8Cell implements Cell {
     readonly blockHash?: Hash;
     readonly blockNumber?: HexNumber;
     readonly txIndex?: HexNumber;
-    private constructor(i: Partial<Cell> & Partial<CellOutput>) {
+    private constructor(i: Partial<I8Cellable> & Partial<I8CellOutputable>) {
         let { capacity, lock, type } = {
-            lock: <Script>{
-                codeHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
-                hashType: "data",
-                args: "0x"
-            },
+            lock: i8ScriptPadding,
             capacity: "0x0",
             ...i.cellOutput,
             ...i
@@ -154,7 +194,7 @@ export class I8Cell implements Cell {
             this.cellOutput = I8CellOutput.from({ capacity, lock, type });
         }
     }
-    static from(i: Partial<Cell> & Partial<CellOutput>) {
+    static from(i: Partial<I8Cellable> & Partial<I8CellOutputable>) {
         return Object.freeze(i instanceof I8Cell ? i : new I8Cell(i));
     }
 }

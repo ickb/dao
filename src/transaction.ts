@@ -1,8 +1,8 @@
-import { CellDep, Header, Hexadecimal, PackedSince } from "@ckb-lumos/base";
+import { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/base";
 import { BI, BIish } from "@ckb-lumos/bi";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { Map as ImmutableMap, List, Record } from "immutable";
-import { cellDeps, epochSinceCompare, headerDeps, I8Cell, since, witness } from "./cell";
+import { cellDeps, epochSinceCompare, headerDeps, I8Cell, scriptEq, since, witness } from "./cell";
 import { bytes } from "@ckb-lumos/codec";
 import { parseAbsoluteEpochSince } from "@ckb-lumos/base/lib/since";
 import { Transaction as TransactionCodec, WitnessArgs } from "@ckb-lumos/base/lib/blockchain";
@@ -58,7 +58,7 @@ export function addCells(
     return tx;
 }
 
-const witnessPadding = hexify(WitnessArgs.pack({ lock: "0x" }));
+const witnessPadding = hexify(WitnessArgs.pack({}));
 function addWitnessesFrom(
     tx: TransactionSkeletonType,
     inputSplicingIndex: number,
@@ -74,18 +74,18 @@ function addWitnessesFrom(
         inputSplicingIndex,
         outputSplicingIndex
     ].reduce((a, b) => a > b ? a : b);
-    const lockWs: (string)[] = [];
+    const lockWs: (string | undefined)[] = [];
     const inputTypeWs: (string | undefined)[] = [];
     const outputTypeWs: (string | undefined)[] = [];
     for (let i = 0; i < witnessesLength; i++) {
         const { lock, inputType, outputType } = WitnessArgs.unpack(tx.witnesses.get(i, witnessPadding));
-        lockWs.push(lock ?? "0x");
+        lockWs.push(lock);
         inputTypeWs.push(inputType);
         outputTypeWs.push(outputType);
     }
 
     //Add new witnesses
-    lockWs.splice(inputSplicingIndex, 0, ...inputs.map(c => c.cellOutput.lock[witness] ?? "0x"));
+    lockWs.splice(inputSplicingIndex, 0, ...inputs.map(c => c.cellOutput.lock[witness]));
     inputTypeWs.splice(inputSplicingIndex, 0, ...inputs.map(c => c.cellOutput.type ?
         c.cellOutput.type[witness] : undefined));
     outputTypeWs.splice(outputSplicingIndex, 0, ...outputs.map(c => c.cellOutput.type ?
@@ -96,10 +96,56 @@ function addWitnessesFrom(
     let witnesses: string[] = [];
     for (let i = 0; i < witnessesLength; i++) {
         witnesses.push(bytes.hexify(WitnessArgs.pack({
-            lock: lockWs.at(i) ?? "0x",
+            lock: lockWs.at(i),
             inputType: inputTypeWs.at(i),
             outputType: outputTypeWs.at(i),
         })));
+    }
+
+    //Trim padding at the end
+    while (witnesses[-1] === witnessPadding) {
+        witnesses.pop();
+    }
+
+    return tx.set("witnesses", List(witnesses));
+}
+
+export function addWitnessPlaceholder(
+    tx: TransactionSkeletonType,
+    accountLock: Script,
+    firstPlaceholder: Hexadecimal = "0x" + "00".repeat(65),
+    restPlaceholder: Hexadecimal = "0x",
+) {
+    let lockPlaceholder = firstPlaceholder;
+    let inputTypePlaceholder = firstPlaceholder;
+    let outputTypePlaceholder = firstPlaceholder;
+
+    const witnesses: string[] = [];
+    const witnessesLength = [
+        tx.inputs.size,
+        tx.outputs.size
+    ].reduce((a, b) => a > b ? a : b);
+    for (let i = 0; i < witnessesLength; i++) {
+        const unpackedWitness = WitnessArgs.unpack(tx.witnesses.get(i, witnessPadding));
+        const { lock, type: inputType } = tx.inputs.get(i)?.cellOutput ?? { lock: undefined, type: undefined };
+        const outputType = tx.outputs.get(i)?.cellOutput.type;
+
+        if (scriptEq(lock, accountLock)) {
+            unpackedWitness.lock = lockPlaceholder;
+            lockPlaceholder = restPlaceholder;
+        }
+
+        if (scriptEq(inputType, accountLock)) {
+            unpackedWitness.inputType = inputTypePlaceholder;
+            inputTypePlaceholder = restPlaceholder;
+        }
+
+        if (scriptEq(outputType, accountLock)) {
+            unpackedWitness.outputType = outputTypePlaceholder;
+            outputTypePlaceholder = restPlaceholder;
+        }
+
+        witnesses.push(hexify(WitnessArgs.pack(unpackedWitness)));
     }
 
     //Trim padding at the end

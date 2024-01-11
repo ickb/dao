@@ -17,26 +17,37 @@ import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction";
 export const errorUndefinedBlockNumber = "Encountered an input cell with blockNumber undefined";
 export function daoSifter(
     inputs: Iterable<Cell>,
-    getHeader: (blockNumber: string, context: Cell) => I8Header) {
+    accountLockExpander: (c: Cell) => I8Script | undefined,
+    getHeader: (blockNumber: string, context: Cell) => I8Header
+) {
     const deposits: I8Cell[] = [];
     const withdrawalRequests: I8Cell[] = [];
     const unknowns: Cell[] = [];
 
-    const deps = defaultScript("DAO")[cellDeps];
-    const extendCell = (c: Cell, header: I8Header, previousHeader?: I8Header, packedSince?: PackedSince) =>
-        I8Cell.from({
-            ...c,
-            blockHash: header.hash,
+    const defaultDaoScript = defaultScript("DAO");
+    const extendCell = (
+        c: Cell,
+        lock: I8Script,
+        header: I8Header,
+        previousHeader?: I8Header,
+        packedSince?: PackedSince
+    ) => I8Cell.from({
+        ...c,
+        cellOutput: {
+            lock,
             type: I8Script.from({
-                ...c.cellOutput.type!,
-                [cellDeps]: deps,
-                [headerDeps]: Object.freeze(previousHeader ? [header, previousHeader] : [header]),
-                [since]: packedSince
-            })
-        });
+                ...defaultDaoScript,
+                [headerDeps]: previousHeader ? [header, previousHeader] : [header],
+                [since]: packedSince ?? defaultDaoScript[since]
+            }),
+            capacity: c.cellOutput.capacity,
+        },
+        blockHash: header.hash,
+    });
 
     for (const c of inputs) {
-        if (!isDao(c)) {
+        const lock = accountLockExpander(c);
+        if (!lock || !isDao(c)) {
             unknowns.push(c);
             continue;
         }
@@ -47,11 +58,11 @@ export function daoSifter(
 
         const h = getHeader(c.blockNumber!, c);
         if (c.data === DEPOSIT_DATA) {
-            deposits.push(extendCell(c, h));
+            deposits.push(extendCell(c, lock, h));
         } else {
             const h1 = getHeader(Uint64.unpack(c.data).toHexString(), c);
             const since = calculateDaoEarliestSinceCompatible(h1.epoch, h.epoch).toString();
-            withdrawalRequests.push(extendCell(c, h, h1, since));
+            withdrawalRequests.push(extendCell(c, lock, h, h1, since));
         }
     }
 
