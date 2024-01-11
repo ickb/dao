@@ -162,13 +162,15 @@ export function serializeConfig(config: Config) {
     return JSON.stringify(Object.freeze({ PREFIX: config.PREFIX, SCRIPTS: Object.freeze(scripts) }), undefined, 2);
 }
 
+export interface DeployScriptData {
+    name: string;
+    hexData: Hexadecimal;
+    codeHash: Hexadecimal;
+    hashType: HashType;
+}
+
 export async function deploy(
-    scriptData: Iterable<{
-        name: string;
-        hexData: Hexadecimal;
-        codeHash: Hexadecimal;
-        hashType: HashType;
-    }>,
+    scriptData: Iterable<DeployScriptData>,
     commit: (cells: Iterable<I8Cell>) => Promise<Iterable<I8OutPoint>>,
     lock: I8Script = defaultScript("SECP256K1_BLAKE160"),
     type?: I8Script
