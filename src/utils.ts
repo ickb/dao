@@ -1,8 +1,8 @@
 import { Script, Cell, Hexadecimal, OutPoint, Header, Transaction, Hash } from "@ckb-lumos/base";
 import { BI, BIish } from "@ckb-lumos/bi";
 import { defaultRpcUrl, defaultScript, getChainInfo } from "./config";
-import { EpochSinceValue } from "@ckb-lumos/base/lib/since";
-import { I8Cell, I8Header, I8Script } from "./cell";
+import { EpochSinceValue, parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since";
+import { I8Cell, I8Header, I8Script, since } from "./cell";
 import { TransactionSkeleton, TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { ckbDelta, daoWithdrawFrom, isDao } from "./dao";
 import { addCells } from "./transaction";
@@ -74,12 +74,21 @@ export function ckbFundAdapter(
     feeRate: BIish,
     addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
     capacities: Iterable<I8Cell>,
-    withdrawalRequests: Iterable<I8Cell> = []
+    tipHeader?: I8Header,
+    withdrawalRequests?: Iterable<I8Cell>,
 ): Asset2Fund {
     const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
-    for (const wr of withdrawalRequests) {
-        addFunds.push((tx: TransactionSkeletonType) => daoWithdrawFrom(tx, [wr]));
+    if (tipHeader && withdrawalRequests) {
+        const tipEpoch = parseEpoch(tipHeader.epoch)
+        for (const wr of withdrawalRequests) {
+            const withdrawalEpoch = parseAbsoluteEpochSince(wr.cellOutput.type![since]);
+            if (epochSinceCompare(tipEpoch, withdrawalEpoch) === -1) {
+                continue;
+            }
+            addFunds.push((tx: TransactionSkeletonType) => daoWithdrawFrom(tx, [wr]));
+        }
     }
+
     for (const c of capacities) {
         addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", [c], []));
     }

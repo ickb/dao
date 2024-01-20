@@ -160,7 +160,7 @@ export function daoRequestWithdrawalWith(
 
     //Filter deposits as requested and sort by minimum withdrawal epoch
     const filteredDeposits = Array.from(deposits).filter(d => maxWithdrawalAmount.gte(d.cellOutput.capacity))
-        .map(d => Object.freeze({ cell: d, withdrawalEpoch: withdrawalEpoch(d, withdrawalRequestEpoch) }))
+        .map(d => Object.freeze({ cell: d, withdrawalEpoch: withdrawalEpochEstimation(d, withdrawalRequestEpoch) }))
         .filter(d => epochSinceCompare(d.withdrawalEpoch, maxWithdrawalEpoch) <= 0)
         .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch))
         .map(d => d.cell);
@@ -185,8 +185,7 @@ export function daoRequestWithdrawalWith(
     return tx;
 }
 
-export function withdrawalEpoch(deposit: I8Cell, withdrawalRequestEpoch: EpochSinceValue) {
-    //Let's fast forward the tip header of slack epoch to avoid withdrawals having to wait one more month
+export function withdrawalEpochEstimation(deposit: I8Cell, withdrawalRequestEpoch: EpochSinceValue) {
     const withdrawalRequestEpochString = generateHeaderEpoch(withdrawalRequestEpoch);
     const depositEpoch = deposit.cellOutput.type![headerDeps][0]!.epoch;
     return parseAbsoluteEpochSince(
