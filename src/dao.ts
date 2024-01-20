@@ -8,11 +8,9 @@ import { EpochSinceValue, generateHeaderEpoch, parseAbsoluteEpochSince } from "@
 import {
     calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
 } from "@ckb-lumos/common-scripts/lib/dao";
-import {
-    epochSinceAdd, epochSinceCompare, I8Cell, I8Script,
-    I8Header, scriptEq, cellDeps, headerDeps, since, witness
-} from "./cell";
+import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell";
 import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction";
+import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
 
 export const errorUndefinedBlockNumber = "Encountered an input cell with blockNumber undefined";
 export function daoSifter(
@@ -83,7 +81,11 @@ export function isDaoWithdrawal(c: Cell) {
     return isDao(c) && c.data !== DEPOSIT_DATA;
 }
 
-export function deposit(tx: TransactionSkeletonType, accountLock: I8Script, capacities: Iterable<BI>) {
+export function daoDeposit(
+    tx: TransactionSkeletonType,
+    capacities: Iterable<BI>,
+    accountLock: I8Script
+) {
     const baseDeposit = I8Cell.from({
         lock: accountLock,
         type: defaultScript("DAO"),
@@ -99,7 +101,11 @@ export function deposit(tx: TransactionSkeletonType, accountLock: I8Script, capa
 }
 
 export const errorDifferentSizeLock = "Withdrawal request lock has different size";
-export function requestWithdrawalFrom(tx: TransactionSkeletonType, deposits: Iterable<I8Cell>, accountLock: I8Script) {
+export function daoRequestWithdrawalFrom(
+    tx: TransactionSkeletonType,
+    deposits: Iterable<I8Cell>,
+    accountLock: I8Script
+) {
 
     const withdrawalRequests: I8Cell[] = [];
     for (const d of deposits) {
@@ -116,7 +122,7 @@ export function requestWithdrawalFrom(tx: TransactionSkeletonType, deposits: Ite
     return addCells(tx, "matched", deposits, withdrawalRequests);
 }
 
-export function withdrawFrom(tx: TransactionSkeletonType, withdrawalRequests: Iterable<I8Cell>) {
+export function daoWithdrawFrom(tx: TransactionSkeletonType, withdrawalRequests: Iterable<I8Cell>) {
     const headerHashes: Hexadecimal[] = [];
     for (let r of withdrawalRequests) {
         headerHashes.push(...r.cellOutput.type![headerDeps].map(h => h.hash));
@@ -139,79 +145,7 @@ export function withdrawFrom(tx: TransactionSkeletonType, withdrawalRequests: It
     return addCells(tx, "append", processedRequests, []);
 }
 
-export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
-export function fund(
-    tx: TransactionSkeletonType,
-    accountLock: I8Script,
-    feeRate: BIish,
-    addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
-    capacities: Iterable<I8Cell>,
-    withdrawalRequests: Iterable<I8Cell> = []) {
-
-    const txWithPlaceholders = addPlaceholders(tx);
-    if (ckbDelta(txWithPlaceholders, feeRate).eq(0)) {
-        return txWithPlaceholders;
-    }
-
-    function* funder() {
-        yield (tx: TransactionSkeletonType) => tx;
-
-        for (const wr of withdrawalRequests) {
-            yield (tx: TransactionSkeletonType) => withdrawFrom(tx, [wr]);
-        }
-        for (const c of capacities) {
-            yield (tx: TransactionSkeletonType) => addCells(tx, "append", [c], []);
-        }
-    }
-
-    let changeCell = I8Cell.from({ lock: accountLock });
-    for (const addFunds of funder()) {
-        //Add funding cells
-        tx = addFunds(tx);
-
-        const txWithPlaceholders = addPlaceholders(addCells(tx, "append", [], [changeCell]));
-        const delta = ckbDelta(txWithPlaceholders, feeRate);
-        if (delta.gte(0)) {
-            changeCell = I8Cell.from({
-                ...changeCell,
-                capacity: delta.add(changeCell.cellOutput.capacity).toHexString()
-            });
-            break;
-        }
-    }
-
-    tx = addPlaceholders(addCells(tx, "append", [], [changeCell]));
-    if (ckbDelta(tx, feeRate).eq(0)) {
-        return tx;
-    }
-
-    throw Error(errorNotEnoughFunds);
-}
-
-export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
-    let ckbDelta = BI.from(0);
-    for (const c of tx.inputs) {
-        //Second Withdrawal step from NervosDAO
-        if (isDaoWithdrawal(c)) {
-            const withdrawalRequest = c as I8Cell;
-            const [withdrawalHeader, depositHeader] = withdrawalRequest.cellOutput.type![headerDeps];
-            const maxWithdrawable = calculateMaximumWithdrawCompatible(c, depositHeader.dao, withdrawalHeader.dao);
-            ckbDelta = ckbDelta.add(maxWithdrawable);
-        } else {
-            ckbDelta = ckbDelta.add(c.cellOutput.capacity);
-        }
-    }
-
-    tx.outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
-
-    if (BI.from(feeRate).gt(0)) {
-        ckbDelta = ckbDelta.sub(calculateFee(txSize(tx), feeRate));
-    }
-
-    return ckbDelta;
-}
-
-export function requestWithdrawalWith(
+export function daoRequestWithdrawalWith(
     tx: TransactionSkeletonType,
     accountLock: I8Script,
     deposits: Iterable<I8Cell>,
@@ -245,39 +179,8 @@ export function requestWithdrawalWith(
     }
 
     if (optimalDeposits.length > 0) {
-        tx = requestWithdrawalFrom(tx, optimalDeposits, accountLock);
+        tx = daoRequestWithdrawalFrom(tx, optimalDeposits, accountLock);
     }
-
-    return tx;
-}
-
-export const errorTooManyOutputs = "A transaction containing Nervos DAO script is currently limited to 64 output cells"
-export const errorIOBalancing = "The transaction doesn't correctly even out input and output capacities";
-export const errorLateWithdrawal = "The transaction includes some deposits" +
-    "whose minimum withdrawal epoch is after the maxLock epoch";
-export function daoPreSendChecks(
-    tx: TransactionSkeletonType,
-    feeRate: BIish,
-    tipEpoch: EpochSinceValue,
-    minLock: EpochSinceValue = { length: 16, index: 1, number: 0 },// 1/16 epoch (~ 15 minutes)
-    maxLock: EpochSinceValue = { length: 8, index: 3, number: 0 }// 3/8 (~ 90 minutes)
-) {
-    if ([...tx.inputs, ...tx.outputs].some(c => isDao(c)) && tx.outputs.size > 64) {
-        throw Error(errorTooManyOutputs);
-    }
-
-    if (!ckbDelta(tx, feeRate).eq(0)) {
-        throw Error(errorIOBalancing);
-    }
-
-    //Let's fast forward the tip header of minLock epoch to avoid withdrawals having to wait one more month
-    const withdrawalRequestEpoch = epochSinceAdd(tipEpoch, minLock);
-    const maxWithdrawalEpoch = epochSinceAdd(tipEpoch, maxLock);
-
-    tx.inputs.filter(isDaoWithdrawal)
-        .map(d => Object.freeze({ cell: d, withdrawalEpoch: withdrawalEpoch(d as I8Cell, withdrawalRequestEpoch) }))
-        .filter(d => epochSinceCompare(d.withdrawalEpoch, maxWithdrawalEpoch) === 1)
-        .forEach(_ => { throw Error(errorLateWithdrawal); })
 
     return tx;
 }
@@ -289,4 +192,27 @@ export function withdrawalEpoch(deposit: I8Cell, withdrawalRequestEpoch: EpochSi
     return parseAbsoluteEpochSince(
         calculateDaoEarliestSinceCompatible(depositEpoch, withdrawalRequestEpochString).toHexString()
     );
+}
+
+export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
+    let ckbDelta = BI.from(0);
+    for (const c of tx.inputs) {
+        //Second Withdrawal step from NervosDAO
+        if (isDaoWithdrawal(c)) {
+            const withdrawalRequest = c as I8Cell;
+            const [withdrawalHeader, depositHeader] = withdrawalRequest.cellOutput.type![headerDeps];
+            const maxWithdrawable = calculateMaximumWithdrawCompatible(c, depositHeader.dao, withdrawalHeader.dao);
+            ckbDelta = ckbDelta.add(maxWithdrawable);
+        } else {
+            ckbDelta = ckbDelta.add(c.cellOutput.capacity);
+        }
+    }
+
+    tx.outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
+
+    if (BI.from(feeRate).gt(0)) {
+        ckbDelta = ckbDelta.sub(calculateFee(txSize(tx), feeRate));
+    }
+
+    return ckbDelta;
 }

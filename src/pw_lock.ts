@@ -3,8 +3,9 @@ import { bytes } from "@ckb-lumos/codec";
 import { Cell, blockchain } from "@ckb-lumos/base";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { createP2PKHMessageGroup } from "@ckb-lumos/common-scripts";
-import { I8Script, scriptEq, witness } from "./cell";
+import { I8Script, witness } from "./cell";
 import { defaultScript } from "./config";
+import { scriptEq } from "./utils";
 
 export interface EthereumRpc {
     (payload: { method: 'personal_sign'; params: [string /*from*/, string /*message*/] }): Promise<string>;

@@ -2,11 +2,12 @@ import { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/ba
 import { BI, BIish } from "@ckb-lumos/bi";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { Map as ImmutableMap, List, Record } from "immutable";
-import { cellDeps, epochSinceCompare, headerDeps, I8Cell, scriptEq, since, witness } from "./cell";
+import { cellDeps, headerDeps, I8Cell, since, witness } from "./cell";
 import { bytes } from "@ckb-lumos/codec";
 import { parseAbsoluteEpochSince } from "@ckb-lumos/base/lib/since";
 import { Transaction as TransactionCodec, WitnessArgs } from "@ckb-lumos/base/lib/blockchain";
 import { hexify } from "@ckb-lumos/codec/lib/bytes";
+import { epochSinceCompare, scriptEq } from "./utils";
 
 export const errorDifferentIOFixedEntries = "Unable to modify entries without messing up fixed entries";
 export const errorDifferentIOLength = "Input and output have different length";

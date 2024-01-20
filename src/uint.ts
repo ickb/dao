@@ -2,7 +2,7 @@
 // https://raw.githubusercontent.com/ckb-js/lumos/develop/packages/codec/src/number/uint.ts
 
 import { BI, BIish } from "@ckb-lumos/bi";
-import { FixedBytesCodec, createFixedBytesCodec } from "@ckb-lumos/codec/lib/base";
+import { createFixedBytesCodec } from "@ckb-lumos/codec/lib/base";
 import { CodecBaseParseError } from "@ckb-lumos/codec/lib/error";
 
 

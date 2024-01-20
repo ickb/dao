@@ -1,12 +1,13 @@
 import { secp256k1Blake160 } from "@ckb-lumos/common-scripts";
 import { TransactionSkeletonType, sealTransaction } from "@ckb-lumos/helpers";
-import { I8Script, scriptEq, witness } from "./cell";
+import { I8Script, witness } from "./cell";
 import { encodeToAddress } from "@ckb-lumos/helpers";
 import { randomBytes } from "crypto";
 import { key } from "@ckb-lumos/hd";
 import { hexify } from "@ckb-lumos/codec/lib/bytes";
 import { defaultScript } from "./config";
 import { Cell } from "@ckb-lumos/base";
+import { scriptEq } from "./utils";
 
 export function secp256k1Blake160Expander(c: Cell, account: I8Secp256k1Blake160Account) {
     if (!scriptEq(c.cellOutput.lock, account.lockScript)) {
