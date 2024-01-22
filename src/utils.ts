@@ -144,6 +144,39 @@ export function capacitiesSifter(
     return { owned, unknowns };
 }
 
+export function sudtSifter(
+    inputs: Iterable<Cell>,
+    sudtType: I8Script,
+    accountLockExpander: (c: Cell) => I8Script | undefined
+) {
+    const owned: I8Cell[] = [];
+    const unknowns: Cell[] = [];
+
+    for (const c of inputs) {
+        if (!scriptEq(c.cellOutput.type, sudtType)) {
+            unknowns.push(c);
+            continue;
+        }
+
+        const lock = accountLockExpander(c);
+        if (!lock) {
+            unknowns.push(c);
+            continue;
+        }
+
+        owned.push(I8Cell.from({
+            ...c,
+            cellOutput: {
+                lock,
+                type: sudtType,
+                capacity: c.cellOutput.capacity
+            }
+        }));
+    }
+
+    return { owned, unknowns };
+}
+
 export const errorBothScriptUndefined = "Comparing two Scripts that both are undefined";
 export function scriptEq(s0: Script | undefined, s1: Script | undefined) {
     if (!s0 && !s1) {
