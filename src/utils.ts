@@ -10,41 +10,53 @@ import { LightClientRPC } from "@ckb-lumos/light-client";
 import { CKBComponents } from "@ckb-lumos/rpc/lib/types/api";
 import { RPC } from "@ckb-lumos/rpc";
 
-export type Asset2Fund = {
-    [name: string]: {// All caps names like CKB, ICKB_SUDT ...
-        addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[]
-        addChange: (tx: TransactionSkeletonType) => TransactionSkeletonType | undefined
-        getDelta: (tx: TransactionSkeletonType) => BI
-    }
-}
-
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
+export const errorIncorrectChange = "Some assets are not balanced correctly between input and output";
 export const errorTooManyOutputs = "A transaction using Nervos DAO script is currently limited to 64 output cells"
 export function fund(tx: TransactionSkeletonType, asset2Fund: Asset2Fund) {
-    //asset2Fund is iterated in the reverse order, so that CKB is last to be funded
-    for (const [name, { addFunds, addChange, getDelta }] of [...Object.entries(asset2Fund)].reverse()) {
-        //Try a quick estimation of how many funds it would take to even out input and output balances
-        let balanceEstimation = getDelta(tx);
-        const reversedAddFunds = [(tx: TransactionSkeletonType) => tx, ...addFunds].reverse();
-        while (balanceEstimation.lt(0) && reversedAddFunds.length > 0) {
-            const addFund = reversedAddFunds.pop()!;
-            tx = addFund(tx);
-            balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
-        }
+    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
+    const addChanges: ((tx: TransactionSkeletonType) => TransactionSkeletonType | undefined)[] = [];
 
-        //Use the slow but 100% accurate method for evening out input and output balances
-        reversedAddFunds.push((tx: TransactionSkeletonType) => tx);
-        for (const addFund of reversedAddFunds.reverse()) {
+    let txWithChange: TransactionSkeletonType | undefined = tx;
+    //asset2Fund is iterated in the reverse order, so that CKB is last to be funded
+    for (const [name, { addFunds: af, addChange: ac, getDelta }] of [...Object.entries(asset2Fund)].reverse()) {
+        addFunds.push(...[...af].reverse());
+        addFunds.push((tx: TransactionSkeletonType) => tx);
+        addChanges.push(ac);
+        let balanceEstimation = getDelta(txWithChange ?? tx);
+        while (addFunds.length > 0) {
+            const addFund = addFunds.pop()!;
             tx = addFund(tx);
-            const newTx = addChange(tx);
-            if (newTx) {
-                tx = newTx;
+
+            //Try a quick estimation of how many funds it would take to even out input and output balances
+            balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
+            if (balanceEstimation.lt(0)) {
+                continue
+            }
+
+            //Use the slow but 100% accurate method to check that enough funds has been added to input
+            txWithChange = tx;
+            for (const ac of addChanges) {
+                txWithChange = ac(txWithChange);
+                if (!txWithChange) {
+                    break;
+                }
+            }
+            if (txWithChange) {
                 break;
             }
         }
 
-        if (!getDelta(tx).eq(0)) {
+        if (!txWithChange) {
             throw new NotEnoughFundsError(name);
+        }
+    }
+    tx = txWithChange;
+
+    //Double check that all assets are accounted for correctly
+    for (const [_, { getDelta }] of Object.entries(asset2Fund)) {
+        if (!getDelta(tx).eq(0)) {
+            throw Error(errorIncorrectChange);
         }
     }
 
@@ -76,7 +88,7 @@ export function ckbFundAdapter(
     capacities: Iterable<I8Cell>,
     tipHeader?: I8Header,
     withdrawalRequests?: Iterable<I8Cell>,
-): Asset2Fund {
+) {
     const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
     if (tipHeader && withdrawalRequests) {
         const tipEpoch = parseEpoch(tipHeader.epoch)
@@ -110,7 +122,44 @@ export function ckbFundAdapter(
 
     const getDelta = (tx: TransactionSkeletonType) => ckbDelta(tx, feeRate);
 
-    return { "CKB": { addFunds, addChange, getDelta } };
+    return addAsset({}, "CKB", addFunds, addChange, getDelta);
+}
+
+export type Asset2Fund = Readonly<{
+    [name: string]: Readonly<{// All caps names like CKB, ICKB_SUDT ...
+        addFunds: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[]
+        addChange: (tx: TransactionSkeletonType) => TransactionSkeletonType | undefined
+        getDelta: (tx: TransactionSkeletonType) => BI
+    }>
+}>;
+
+export const errorInvalidAsset = "Invalid asset funding actions";
+export function addAsset(
+    asset2Fund: Asset2Fund,
+    name: string,// All caps names like CKB, ICKB_SUDT ...
+    addFunds: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
+    addChange?: (tx: TransactionSkeletonType) => TransactionSkeletonType | undefined,
+    getDelta?: (tx: TransactionSkeletonType) => BI
+): Asset2Fund {
+    const old = asset2Fund[name];
+    if (old) {
+        addFunds = addFunds.concat(old.addFunds);
+        addChange = addChange ?? old.addChange;
+        getDelta = getDelta ?? old.getDelta;
+    }
+
+    if (!addChange || !getDelta) {
+        throw Error(errorInvalidAsset);
+    }
+
+    return Object.freeze({
+        ...asset2Fund,
+        [name]: Object.freeze({
+            addFunds: Object.freeze(addFunds),
+            addChange,
+            getDelta
+        })
+    })
 }
 
 export function capacitiesSifter(
