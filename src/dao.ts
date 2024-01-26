@@ -1,10 +1,10 @@
-import { Cell, Hexadecimal, PackedSince } from "@ckb-lumos/base";
+import { Cell, Hexadecimal, PackedDao, PackedSince } from "@ckb-lumos/base";
 import { BI, BIish } from "@ckb-lumos/bi";
 import { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { defaultScript } from "./config";
 import { hexify } from "@ckb-lumos/codec/lib/bytes";
 import { Uint64 } from "@ckb-lumos/codec/lib/number/uint";
-import { EpochSinceValue, generateHeaderEpoch, parseAbsoluteEpochSince } from "@ckb-lumos/base/lib/since";
+import { EpochSinceValue, generateHeaderEpoch, parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since";
 import {
     calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
 } from "@ckb-lumos/common-scripts/lib/dao";
@@ -150,31 +150,35 @@ export function daoRequestWithdrawalWith(
     accountLock: I8Script,
     deposits: Iterable<I8Cell>,
     maxWithdrawalAmount: BI,
-    tipEpoch: EpochSinceValue,
+    tipHeader: I8Header,
     minLock: EpochSinceValue = { length: 8, index: 1, number: 0 },// 1/8 epoch (~ 30 minutes)
     maxLock: EpochSinceValue = { length: 4, index: 1, number: 0 }// 1/4 epoch (~ 1 hour)
 ) {
+    const withdrawalRequestDao = tipHeader.dao;
+
     //Let's fast forward the tip header of minLock epoch to avoid withdrawals having to wait one more month
+    const tipEpoch = parseEpoch(tipHeader.epoch);
     const withdrawalRequestEpoch = epochSinceAdd(tipEpoch, minLock);
     const maxWithdrawalEpoch = epochSinceAdd(tipEpoch, maxLock);
 
     //Filter deposits as requested and sort by minimum withdrawal epoch
-    const filteredDeposits = Array.from(deposits).filter(d => maxWithdrawalAmount.gte(d.cellOutput.capacity))
-        .map(d => Object.freeze({ cell: d, withdrawalEpoch: withdrawalEpochEstimation(d, withdrawalRequestEpoch) }))
+    const processedDeposits = Array.from(deposits)
+        .map(d => Object.freeze({
+            deposit: d,
+            withdrawalEpoch: withdrawalEpochEstimation(d, withdrawalRequestEpoch),
+            withdrawalAmount: withdrawalAmountEstimation(d, withdrawalRequestDao)
+        }))
         .filter(d => epochSinceCompare(d.withdrawalEpoch, maxWithdrawalEpoch) <= 0)
-        .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch))
-        .map(d => d.cell);
+        .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch));
 
     //It does NOT attempt to solve the Knapsack problem, it just withdraw the earliest deposits under budget
-    let withdrawalAmount = BI.from(0);
+    let currentWithdrawalAmount = BI.from(0);
     const optimalDeposits: I8Cell[] = []
-    for (const d of filteredDeposits) {
-        const newWithdrawalAmount = withdrawalAmount.add(d.cellOutput.capacity);
+    for (const { deposit, withdrawalAmount } of processedDeposits) {
+        const newWithdrawalAmount = currentWithdrawalAmount.add(withdrawalAmount);
         if (maxWithdrawalAmount.lte(newWithdrawalAmount)) {
-            withdrawalAmount = newWithdrawalAmount;
-            optimalDeposits.push(d);
-        } else {
-            break;
+            currentWithdrawalAmount = newWithdrawalAmount;
+            optimalDeposits.push(deposit);
         }
     }
 
@@ -191,6 +195,11 @@ export function withdrawalEpochEstimation(deposit: I8Cell, withdrawalRequestEpoc
     return parseAbsoluteEpochSince(
         calculateDaoEarliestSinceCompatible(depositEpoch, withdrawalRequestEpochString).toHexString()
     );
+}
+
+export function withdrawalAmountEstimation(deposit: I8Cell, withdrawalRequestDao: PackedDao) {
+    const depositDao = deposit.cellOutput.type![headerDeps][0]!.dao;
+    return calculateMaximumWithdrawCompatible(deposit, depositDao, withdrawalRequestDao);
 }
 
 export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
