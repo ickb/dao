@@ -147,11 +147,12 @@ export function daoWithdrawFrom(tx: TransactionSkeletonType, withdrawalRequests:
 
 export function daoRequestWithdrawalWith(
     tx: TransactionSkeletonType,
-    accountLock: I8Script,
     deposits: Iterable<I8Cell>,
-    maxWithdrawalAmount: BI,
+    accountLock: I8Script,
     tipHeader: I8Header,
-    minLock: EpochSinceValue = { length: 8, index: 1, number: 0 },// 1/8 epoch (~ 30 minutes)
+    maxWithdrawalAmount: BI,
+    maxWithdrawalCells: number = Number.POSITIVE_INFINITY,
+    minLock: EpochSinceValue = { length: 16, index: 1, number: 0 },// 1/8 epoch (~ 15 minutes)
     maxLock: EpochSinceValue = { length: 4, index: 1, number: 0 }// 1/4 epoch (~ 1 hour)
 ) {
     const withdrawalRequestDao = tipHeader.dao;
@@ -163,6 +164,7 @@ export function daoRequestWithdrawalWith(
 
     //Filter deposits as requested and sort by minimum withdrawal epoch
     const processedDeposits = Array.from(deposits)
+        .filter(d => maxWithdrawalAmount.gte(d.cellOutput.capacity))
         .map(d => Object.freeze({
             deposit: d,
             withdrawalEpoch: withdrawalEpochEstimation(d, withdrawalRequestEpoch),
@@ -179,6 +181,9 @@ export function daoRequestWithdrawalWith(
         if (maxWithdrawalAmount.lte(newWithdrawalAmount)) {
             currentWithdrawalAmount = newWithdrawalAmount;
             optimalDeposits.push(deposit);
+            if (optimalDeposits.length === maxWithdrawalCells) {
+                break;
+            }
         }
     }
 
