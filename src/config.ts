@@ -6,7 +6,7 @@ import {
     predefined, getConfig, initializeConfig as unadaptedInitializeConfig
 } from "@ckb-lumos/config-manager/lib";
 import { I8Cell, I8Script, I8OutPoint, I8CellDep, cellDeps, i8ScriptPadding } from "./cell";
-import { getGenesisBlock, getTransaction } from "./utils";
+import { getGenesisBlock, getTransaction } from "./rpc";
 
 const chain2RpcUrl = Object.freeze({
     mainnet: "https://rpc.ankr.com/nervos_ckb",
