@@ -6,6 +6,8 @@ import { ckbDelta, daoWithdrawFrom, isDao } from "./dao";
 import { addCells } from "./transaction";
 import { epochSinceCompare } from "./utils";
 
+const zero = BI.from(0);
+
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
 export const errorIncorrectChange = "Some assets are not balanced correctly between input and output";
 export const errorTooManyOutputs = "A transaction using Nervos DAO script is currently limited to 64 output cells"
@@ -26,7 +28,7 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
 
             //Try a quick estimation of how many funds it would take to even out input and output balances
             balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
-            if (balanceEstimation.lt(0)) {
+            if (balanceEstimation.lt(zero)) {
                 continue
             }
 
@@ -51,7 +53,7 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
 
     //Double check that all assets are accounted for correctly
     for (const [_, { getDelta }] of Object.entries(assets)) {
-        if (!getDelta(tx).eq(0)) {
+        if (!getDelta(tx).eq(zero)) {
             throw Error(errorIncorrectChange);
         }
     }
@@ -85,13 +87,13 @@ export function ckbFundAdapter(
     tipHeader?: I8Header,
     withdrawalRequests?: Iterable<I8Cell>,
 ) {
-    const getDelta = (tx: TransactionSkeletonType) => ckbDelta(tx, feeRate);
+    const getDelta = (tx: TransactionSkeletonType) => tx.equals(TransactionSkeleton()) ? zero : ckbDelta(tx, feeRate);
 
     const addChange = (tx: TransactionSkeletonType) => {
         let changeCell = I8Cell.from({ lock: accountLock });
         const txWithPlaceholders = addPlaceholders(addCells(tx, "append", [], [changeCell]));
         const delta = getDelta(txWithPlaceholders);
-        if (delta.lt(0)) {
+        if (delta.lt(zero)) {
             return undefined;
         }
 
@@ -149,7 +151,6 @@ export function addAsset(
         throw Error(errorDuplicatedAsset);
     }
 
-    const zero = BI.from(0);
     assets = Object.freeze({
         ...assets,
         [name]: Object.freeze({
@@ -177,8 +178,6 @@ export function addAssetsFunds(
     const mutableAssets = Object.fromEntries(Object.entries(assets)
         .map(([name, { getDelta, addChange, addFunds, availableBalance, balance }]) =>
             [name, { getDelta, addChange, addFunds: [...addFunds], availableBalance, balance }]));
-
-    const zero = BI.from(0);
 
     for (const tx of unavailableFunds ?? []) {
         for (const [name, { getDelta, balance }] of Object.entries(mutableAssets)) {

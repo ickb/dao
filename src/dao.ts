@@ -1,6 +1,6 @@
 import { Cell, Hexadecimal, PackedDao, PackedSince } from "@ckb-lumos/base";
 import { BI, BIish } from "@ckb-lumos/bi";
-import { TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { TransactionSkeleton, TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { defaultScript } from "./config";
 import { hexify } from "@ckb-lumos/codec/lib/bytes";
 import { Uint64 } from "@ckb-lumos/codec/lib/number/uint";
@@ -11,6 +11,8 @@ import {
 import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell";
 import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction";
 import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
+
+const zero = BI.from(0);
 
 export const errorUndefinedBlockNumber = "Encountered an input cell with blockNumber undefined";
 export function daoSifter(
@@ -174,7 +176,7 @@ export function daoRequestWithdrawalWith(
         .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch));
 
     //It does NOT attempt to solve the Knapsack problem, it just withdraw the earliest deposits under budget
-    let currentWithdrawalAmount = BI.from(0);
+    let currentWithdrawalAmount = zero;
     const optimalDeposits: I8Cell[] = []
     for (const { deposit, withdrawalAmount } of processedDeposits) {
         const newWithdrawalAmount = currentWithdrawalAmount.add(withdrawalAmount);
@@ -208,7 +210,7 @@ export function withdrawalAmountEstimation(deposit: I8Cell, withdrawalRequestDao
 }
 
 export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
-    let ckbDelta = BI.from(0);
+    let ckbDelta = zero;
     for (const c of tx.inputs) {
         //Second Withdrawal step from NervosDAO
         if (isDaoWithdrawal(c)) {
@@ -223,7 +225,8 @@ export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
 
     tx.outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
 
-    if (BI.from(feeRate).gt(0)) {
+    //Don't account for the tx fee if there are no outputs
+    if (BI.from(feeRate).gt(zero) && tx.outputs.size !== 0) {
         ckbDelta = ckbDelta.sub(calculateFee(txSize(tx), feeRate));
     }
 
