@@ -154,7 +154,7 @@ export async function sendTransaction(tx: Transaction, secondsTimeout: number = 
 export async function getTipHeader() {
     //Same signature for both RPC and light client RPC
     const chainInfo = getChainInfo();
-    return new RPC(chainInfo.rpcUrl).getTipHeader();
+    return I8Header.from(await new RPC(chainInfo.rpcUrl).getTipHeader());
 }
 
 export async function getGenesisBlock() {
@@ -169,7 +169,7 @@ export async function getGenesisBlock() {
 export async function getHeader(blockHash: Hash) {
     //Same signature for both RPC and light client RPC
     const chainInfo = getChainInfo();
-    return new RPC(chainInfo.rpcUrl).getHeader(blockHash);
+    return I8Header.from(await new RPC(chainInfo.rpcUrl).getHeader(blockHash));
 }
 
 export async function getTransaction(txHash: Hash) {
