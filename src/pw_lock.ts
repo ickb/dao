@@ -25,10 +25,10 @@ export function getEthereumProvider() {
     return window.ethereum as EthereumProvider;
 }
 
-export function pwLock(provider: EthereumProvider = getEthereumProvider()) {
+export function pwLock(provider?: EthereumProvider) {
     const lockScript = I8Script.from({
         ...defaultScript("PW_LOCK"),
-        args: getEthereumProvider().selectedAddress,
+        args: (provider ?? getEthereumProvider()).selectedAddress,
         [witness]: "0x" + "00".repeat(65)
     });
 
@@ -42,7 +42,7 @@ export function pwLock(provider: EthereumProvider = getEthereumProvider()) {
         return lockScript;
     }
 
-    async function signer(transaction: TransactionSkeletonType) {
+    async function signer(transaction: TransactionSkeletonType, provider?: EthereumProvider) {
         // just like P2PKH: https://github.com/nervosnetwork/ckb-system-scripts/wiki/How-to-sign-transaction    
         const keccak = createKeccak("keccak256");
 
@@ -53,7 +53,7 @@ export function pwLock(provider: EthereumProvider = getEthereumProvider()) {
             },
         })[0];
 
-        const ethereum = getEthereumProvider();
+        const ethereum = provider ?? getEthereumProvider();
 
         let signedMessage = await ethereum.request({
             method: "personal_sign",

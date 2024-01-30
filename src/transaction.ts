@@ -15,8 +15,8 @@ export const errorNotEmptySigningEntries = "Signing Entries are not empty"
 export function addCells(
     tx: TransactionSkeletonType,
     mode: "matched" | "append",
-    inputs: Iterable<I8Cell>,
-    outputs: Iterable<I8Cell>,
+    inputs: readonly I8Cell[],
+    outputs: readonly I8Cell[],
 ): TransactionSkeletonType {
     const fixedEntries = parseFixedEntries(tx);
 
@@ -206,7 +206,7 @@ function addHeaderDepsFrom(tx: TransactionSkeletonType, inputs: List<I8Cell>, ou
     return addHeaderDeps(tx, ...deps.map(h => h.hash));
 }
 
-export function addHeaderDeps(tx: TransactionSkeletonType, ...headers: Hexadecimal[]) {
+export function addHeaderDeps(tx: TransactionSkeletonType, ...headers: readonly Hexadecimal[]) {
     const fixedEntries = parseFixedEntries(tx);
     let headerDeps = tx.headerDeps.push(...headers);
     //Use a Set (preserving order) to remove duplicates

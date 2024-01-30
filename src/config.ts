@@ -172,20 +172,24 @@ export interface DeployScriptData {
 }
 
 export async function deploy(
-    scriptData: Iterable<DeployScriptData>,
-    commit: (cells: Iterable<I8Cell>) => Promise<Iterable<I8OutPoint>>,
-    lock: I8Script = defaultScript("SECP256K1_BLAKE160"),
+    scriptData: readonly DeployScriptData[],
+    commit: (cells: readonly I8Cell[]) => Promise<I8OutPoint[]>,
+    lock: I8Script = i8ScriptPadding,
     type?: I8Script
 ) {
+    if (lock === i8ScriptPadding) {
+        lock = defaultScript("SECP256K1_BLAKE160");
+    }
+
     const dataCells: I8Cell[] = [];
     for (const { hexData: data } of scriptData) {
         dataCells.push(I8Cell.from({ lock, type, data }));
     }
 
-    const outPoints = Array.from(await commit(dataCells));
+    const outPoints = await commit(dataCells);
     const newScriptConfig: ScriptConfigs = {};
     const oldConfig = getConfig();
-    Array.from(scriptData).forEach(({ name, codeHash, hashType }, i) => {
+    scriptData.forEach(({ name, codeHash, hashType }, i) => {
         newScriptConfig[name] = new ScriptConfigAdapter(I8Script.from({
             ...i8ScriptPadding,
             codeHash,
@@ -210,12 +214,16 @@ async function _getCellData(outPoint: I8OutPoint) {
 
 export const errorScriptNotFound = "Script not found in Config";
 export async function createDepGroup(
-    scriptNames: Iterable<string>,
-    commit: (cells: Iterable<I8Cell>) => Promise<Iterable<I8OutPoint>>,
-    lock: I8Script = defaultScript("SECP256K1_BLAKE160"),
+    scriptNames: readonly string[],
+    commit: (cells: readonly I8Cell[]) => Promise<I8OutPoint[]>,
+    lock: I8Script = i8ScriptPadding,
     type?: I8Script,
     getCellData: (outPoint: I8OutPoint) => Promise<string> = _getCellData
 ) {
+    if (lock === i8ScriptPadding) {
+        lock = defaultScript("SECP256K1_BLAKE160");
+    }
+
     const outPointsCodec = vector(blockchain.OutPoint);
     const serializeOutPoint = (p: OutPoint) => `${p.txHash}-${p.index}`;
     const serializedOutPoint2OutPoint: Map<string, I8OutPoint> = new Map();

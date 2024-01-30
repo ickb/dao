@@ -18,9 +18,9 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
     let txWithChange: TransactionSkeletonType | undefined = tx;
     //assets is iterated in the reverse order, so that CKB is last to be funded
     for (const [name, { getDelta, addChange: ac, addFunds: af }] of [...Object.entries(assets)].reverse()) {
+        addChanges.push(ac);
         addFunds.push(...af);
         addFunds.push((tx: TransactionSkeletonType) => tx);
-        addChanges.push(ac);
         let balanceEstimation = getDelta(txWithChange ?? tx);
         while (addFunds.length > 0) {
             const addFund = addFunds.pop()!;
@@ -29,7 +29,7 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
             //Try a quick estimation of how many funds it would take to even out input and output balances
             balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
             if (balanceEstimation.lt(zero)) {
-                continue
+                continue;
             }
 
             //Use the slow but 100% accurate method to check that enough funds has been added to input
@@ -83,13 +83,17 @@ export function ckbFundAdapter(
     accountLock: I8Script,
     feeRate: BIish,
     addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
-    capacities: Iterable<I8Cell>,
+    capacities: readonly I8Cell[],
     tipHeader?: I8Header,
-    withdrawalRequests?: Iterable<I8Cell>,
+    withdrawalRequests?: readonly I8Cell[],
 ) {
-    const getDelta = (tx: TransactionSkeletonType) => tx.equals(TransactionSkeleton()) ? zero : ckbDelta(tx, feeRate);
+    const getDelta = (tx: TransactionSkeletonType) => ckbDelta(tx, feeRate);
 
     const addChange = (tx: TransactionSkeletonType) => {
+        if (tx.equals(TransactionSkeleton())) {
+            return tx;
+        }
+
         let changeCell = I8Cell.from({ lock: accountLock });
         const txWithPlaceholders = addPlaceholders(addCells(tx, "append", [], [changeCell]));
         const delta = getDelta(txWithPlaceholders);
@@ -104,13 +108,8 @@ export function ckbFundAdapter(
         return addPlaceholders(addCells(tx, "append", [], [changeCell]));
     }
 
-    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
     const unavailableWithdrawalRequests: I8Cell[] = [];
-
-    for (const c of capacities) {
-        addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", [c], []));
-    }
-
+    const addFunds = capacities.map(c => (tx: TransactionSkeletonType) => addCells(tx, "append", [c], []));
     if (tipHeader && withdrawalRequests) {
         const tipEpoch = parseEpoch(tipHeader.epoch)
         for (const wr of withdrawalRequests) {
@@ -144,8 +143,8 @@ export function addAsset(
     name: string,// All caps names like CKB, ICKB_SUDT ...
     getDelta: (tx: TransactionSkeletonType) => BI,
     addChange: (tx: TransactionSkeletonType) => TransactionSkeletonType | undefined,
-    addFunds?: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
-    unavailableFunds?: TransactionSkeletonType[]
+    addFunds?: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
+    unavailableFunds?: readonly TransactionSkeletonType[]
 ): Assets {
     if (assets[name]) {
         throw Error(errorDuplicatedAsset);
@@ -172,8 +171,8 @@ export function addAsset(
 export const errorNonPositiveBalance = "Fund add zero or negative balance";
 export function addAssetsFunds(
     assets: Assets,
-    addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] | undefined,
-    unavailableFunds?: TransactionSkeletonType[]
+    addFunds: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] | undefined,
+    unavailableFunds?: readonly TransactionSkeletonType[]
 ): Assets {
     const mutableAssets = Object.fromEntries(Object.entries(assets)
         .map(([name, { getDelta, addChange, addFunds, availableBalance, balance }]) =>

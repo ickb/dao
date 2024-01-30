@@ -1,6 +1,6 @@
 import { Cell, Hexadecimal, PackedDao, PackedSince } from "@ckb-lumos/base";
 import { BI, BIish } from "@ckb-lumos/bi";
-import { TransactionSkeleton, TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { defaultScript } from "./config";
 import { hexify } from "@ckb-lumos/codec/lib/bytes";
 import { Uint64 } from "@ckb-lumos/codec/lib/number/uint";
@@ -16,7 +16,7 @@ const zero = BI.from(0);
 
 export const errorUndefinedBlockNumber = "Encountered an input cell with blockNumber undefined";
 export function daoSifter(
-    inputs: Iterable<Cell>,
+    inputs: readonly Cell[],
     accountLockExpander: (c: Cell) => I8Script | undefined,
     getHeader: (blockNumber: string, context: Cell) => I8Header
 ) {
@@ -85,7 +85,7 @@ export function isDaoWithdrawal(c: Cell) {
 
 export function daoDeposit(
     tx: TransactionSkeletonType,
-    capacities: Iterable<BI>,
+    capacities: readonly BI[],
     accountLock: I8Script
 ) {
     const baseDeposit = I8Cell.from({
@@ -94,10 +94,7 @@ export function daoDeposit(
         data: DEPOSIT_DATA,
     });
 
-    const deposits: I8Cell[] = [];
-    for (const capacity of capacities) {
-        deposits.push(I8Cell.from({ ...baseDeposit, capacity: capacity.toHexString() }));
-    }
+    const deposits = capacities.map(c => I8Cell.from({ ...baseDeposit, capacity: c.toHexString() }));
 
     return addCells(tx, "append", [], deposits);
 }
@@ -105,7 +102,7 @@ export function daoDeposit(
 export const errorDifferentSizeLock = "Withdrawal request lock has different size";
 export function daoRequestWithdrawalFrom(
     tx: TransactionSkeletonType,
-    deposits: Iterable<I8Cell>,
+    deposits: readonly I8Cell[],
     accountLock: I8Script
 ) {
 
@@ -124,9 +121,9 @@ export function daoRequestWithdrawalFrom(
     return addCells(tx, "matched", deposits, withdrawalRequests);
 }
 
-export function daoWithdrawFrom(tx: TransactionSkeletonType, withdrawalRequests: Iterable<I8Cell>) {
+export function daoWithdrawFrom(tx: TransactionSkeletonType, withdrawalRequests: readonly I8Cell[]) {
     const headerHashes: Hexadecimal[] = [];
-    for (let r of withdrawalRequests) {
+    for (const r of withdrawalRequests) {
         headerHashes.push(...r.cellOutput.type![headerDeps].map(h => h.hash));
     }
     tx = addHeaderDeps(tx, ...headerHashes);
@@ -149,7 +146,7 @@ export function daoWithdrawFrom(tx: TransactionSkeletonType, withdrawalRequests:
 
 export function daoRequestWithdrawalWith(
     tx: TransactionSkeletonType,
-    deposits: Iterable<I8Cell>,
+    deposits: readonly I8Cell[],
     accountLock: I8Script,
     tipHeader: I8Header,
     maxWithdrawalAmount: BI,
@@ -165,7 +162,7 @@ export function daoRequestWithdrawalWith(
     const maxWithdrawalEpoch = epochSinceAdd(tipEpoch, maxLock);
 
     //Filter deposits as requested and sort by minimum withdrawal epoch
-    const processedDeposits = Array.from(deposits)
+    const processedDeposits = deposits
         .filter(d => maxWithdrawalAmount.gte(d.cellOutput.capacity))
         .map(d => Object.freeze({
             deposit: d,
@@ -226,7 +223,7 @@ export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
     tx.outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
 
     //Don't account for the tx fee if there are no outputs
-    if (BI.from(feeRate).gt(zero) && tx.outputs.size !== 0) {
+    if (tx.outputs.size > 0 && BI.from(feeRate).gt(zero)) {
         ckbDelta = ckbDelta.sub(calculateFee(txSize(tx), feeRate));
     }
 

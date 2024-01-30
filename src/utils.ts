@@ -5,7 +5,7 @@ import { EpochSinceValue } from "@ckb-lumos/base/lib/since";
 import { I8Cell, I8Script } from "./cell";
 
 export function capacitiesSifter(
-    inputs: Iterable<Cell>,
+    inputs: readonly Cell[],
     accountLockExpander: (c: Cell) => I8Script | undefined
 ) {
     const owned: I8Cell[] = [];
@@ -36,7 +36,7 @@ export function capacitiesSifter(
 }
 
 export function sudtSifter(
-    inputs: Iterable<Cell>,
+    inputs: readonly Cell[],
     sudtType: I8Script,
     accountLockExpander: (c: Cell) => I8Script | undefined
 ) {

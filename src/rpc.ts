@@ -11,8 +11,8 @@ import { scriptEq } from "./utils";
 
 const errorHeaderNotFound = "Unable to reach the Header given the block number and the context";
 export async function getHeaderByNumber(
-    queries: { blockNum: Hexadecimal, context: OutPoint }[],
-    knownHeaders: Iterable<I8Header> = []
+    queries: readonly { blockNum: Hexadecimal, context: OutPoint }[],
+    knownHeaders: readonly I8Header[] = []
 ) {
     const blockNum2Header: Map<Hexadecimal, I8Header> = new Map();
     const blockHash2Header: Map<Hexadecimal, I8Header> = new Map();
@@ -58,13 +58,17 @@ export async function getHeaderByNumber(
         blockHash2Header.set(h.hash, i8h);
     }
 
-    for (const blockNum of wantedBlockNums) {
-        if (!blockNum2Header.has(blockNum)) {
+    const headers: I8Header[] = [];
+    for (const blockNum of new Set(queries.map(({ blockNum }) => blockNum))) {
+        const h = blockNum2Header.get(blockNum);
+        if (!h) {
             throw Error(errorHeaderNotFound);
         }
+
+        headers.push(h);
     }
 
-    return [...blockHash2Header.values()];
+    return headers;
 }
 
 export async function getCells<WithData extends boolean = true>(
