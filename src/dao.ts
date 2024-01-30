@@ -169,6 +169,7 @@ export function daoRequestWithdrawalWith(
             withdrawalEpoch: withdrawalEpochEstimation(d, withdrawalRequestEpoch),
             withdrawalAmount: withdrawalAmountEstimation(d, withdrawalRequestDao)
         }))
+        .filter(({ withdrawalAmount }) => maxWithdrawalAmount.gte(withdrawalAmount))
         .filter(d => epochSinceCompare(d.withdrawalEpoch, maxWithdrawalEpoch) <= 0)
         .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch));
 
@@ -177,12 +178,13 @@ export function daoRequestWithdrawalWith(
     const optimalDeposits: I8Cell[] = []
     for (const { deposit, withdrawalAmount } of processedDeposits) {
         const newWithdrawalAmount = currentWithdrawalAmount.add(withdrawalAmount);
-        if (maxWithdrawalAmount.lte(newWithdrawalAmount)) {
-            currentWithdrawalAmount = newWithdrawalAmount;
-            optimalDeposits.push(deposit);
-            if (optimalDeposits.length === maxWithdrawalCells) {
-                break;
-            }
+        if (newWithdrawalAmount.gt(maxWithdrawalAmount)) {
+            continue;
+        }
+        currentWithdrawalAmount = newWithdrawalAmount;
+        optimalDeposits.push(deposit);
+        if (optimalDeposits.length >= maxWithdrawalCells) {
+            break;
         }
     }
 
