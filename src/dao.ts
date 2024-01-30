@@ -131,7 +131,7 @@ export function daoWithdrawFrom(tx: TransactionSkeletonType, withdrawalRequests:
     const processedRequests: I8Cell[] = [];
     const header2index = new Map(tx.headerDeps.map((h, i) => [h, i]));
     for (const r of withdrawalRequests) {
-        const depositHeader = r.cellOutput.type![headerDeps][-1]!;
+        const depositHeader = r.cellOutput.type![headerDeps].at(-1)!;
         processedRequests.push(I8Cell.from({
             ...r,
             type: I8Script.from({
