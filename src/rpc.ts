@@ -73,7 +73,7 @@ export async function getHeaderByNumber(
 
 export async function getCells<WithData extends boolean = true>(
     searchKey: CKBComponents.GetCellsSearchKey<WithData>,
-    order: CKBComponents.Order = "asc",
+    order: CKBComponents.Order = "desc",
     limit: CKBComponents.Hash = "0xffffffff",
     cursor?: CKBComponents.Hash256) {
     //Same signature for both RPC and light client RPC
