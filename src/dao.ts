@@ -79,7 +79,7 @@ export function isDaoDeposit(c: Cell) {
     return isDao(c) && c.data === DEPOSIT_DATA;
 }
 
-export function isDaoWithdrawal(c: Cell) {
+export function isDaoWithdrawalRequest(c: Cell) {
     return isDao(c) && c.data !== DEPOSIT_DATA;
 }
 
@@ -212,7 +212,7 @@ export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
     let ckbDelta = zero;
     for (const c of tx.inputs) {
         //Second Withdrawal step from NervosDAO
-        if (isDaoWithdrawal(c)) {
+        if (isDaoWithdrawalRequest(c)) {
             const withdrawalRequest = c as I8Cell;
             const [withdrawalHeader, depositHeader] = withdrawalRequest.cellOutput.type![headerDeps];
             const maxWithdrawable = calculateMaximumWithdrawCompatible(c, depositHeader.dao, withdrawalHeader.dao);

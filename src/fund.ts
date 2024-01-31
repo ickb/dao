@@ -8,6 +8,7 @@ import { epochSinceCompare } from "./utils";
 
 const zero = BI.from(0);
 
+export const errorNoFundingMethods = "No funding method specified";
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
 export const errorIncorrectChange = "Some assets are not balanced correctly between input and output";
 export const errorTooManyOutputs = "A transaction using Nervos DAO script is currently limited to 64 output cells"
@@ -15,9 +16,10 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
     const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
     const addChanges: ((tx: TransactionSkeletonType) => TransactionSkeletonType | undefined)[] = [];
 
-    let txWithChange: TransactionSkeletonType | undefined = tx;
+    let txWithChange: TransactionSkeletonType | undefined = undefined;
     //assets is iterated in the reverse order, so that CKB is last to be funded
     for (const [name, { getDelta, addChange: ac, addFunds: af }] of [...Object.entries(assets)].reverse()) {
+        txWithChange = undefined;
         addChanges.push(ac);
         addFunds.push(...af);
         addFunds.push((tx: TransactionSkeletonType) => tx);
@@ -48,6 +50,9 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
         if (!txWithChange) {
             throw new NotEnoughFundsError(name);
         }
+    }
+    if (!txWithChange) {
+        throw Error(errorNoFundingMethods);
     }
     tx = txWithChange;
 
