@@ -12,45 +12,64 @@ export const errorNoFundingMethods = "No funding method specified";
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
 export const errorIncorrectChange = "Some assets are not balanced correctly between input and output";
 export const errorTooManyOutputs = "A transaction using Nervos DAO script is currently limited to 64 output cells"
-export function fund(tx: TransactionSkeletonType, assets: Assets) {
+export function fund(tx: TransactionSkeletonType, assets: Assets, useAll: boolean = false) {
     const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
     const addChanges: ((tx: TransactionSkeletonType) => TransactionSkeletonType | undefined)[] = [];
 
     let txWithChange: TransactionSkeletonType | undefined = undefined;
-    //assets is iterated in the reverse order, so that CKB is last to be funded
-    for (const [name, { getDelta, addChange: ac, addFunds: af }] of [...Object.entries(assets)].reverse()) {
-        txWithChange = undefined;
-        addChanges.push(ac);
-        addFunds.push(...af);
-        addFunds.push((tx: TransactionSkeletonType) => tx);
-        let balanceEstimation = getDelta(txWithChange ?? tx);
-        while (addFunds.length > 0) {
-            const addFund = addFunds.pop()!;
-            tx = addFund(tx);
 
-            //Try a quick estimation of how many funds it would take to even out input and output balances
-            balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
-            if (balanceEstimation.lt(zero)) {
-                continue;
-            }
+    if (!useAll) {
+        //Assets is iterated in the reverse order, so that CKB is last to be funded
+        for (const [name, { getDelta, addChange: ac, addFunds: af }] of [...Object.entries(assets)].reverse()) {
+            txWithChange = undefined;
+            addChanges.push(ac);
+            addFunds.push(...af);
+            addFunds.push((tx: TransactionSkeletonType) => tx);
+            let balanceEstimation = getDelta(txWithChange ?? tx);
+            while (addFunds.length > 0) {
+                const addFund = addFunds.pop()!;
+                tx = addFund(tx);
 
-            //Use the slow but 100% accurate method to check that enough funds has been added to input
-            txWithChange = tx;
-            for (const ac of addChanges) {
-                txWithChange = ac(txWithChange);
-                if (!txWithChange) {
+                //Try a quick estimation of how many funds it would take to even out input and output balances
+                balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
+                if (balanceEstimation.lt(zero)) {
+                    continue;
+                }
+
+                //Use the slow but 100% accurate method to check that enough funds has been added to input
+                txWithChange = tx;
+                for (const ac of addChanges) {
+                    txWithChange = ac(txWithChange);
+                    if (!txWithChange) {
+                        break;
+                    }
+                }
+                if (txWithChange) {
                     break;
                 }
             }
-            if (txWithChange) {
-                break;
+
+            if (!txWithChange) {
+                throw new NotEnoughFundsError(name);
             }
         }
-
-        if (!txWithChange) {
-            throw new NotEnoughFundsError(name);
+    } else {
+        //Use all funds to fund the current transaction
+        for (const [_, { addFunds }] of Object.entries(assets)) {
+            for (const addFund of addFunds) {
+                tx = addFund(tx);
+            }
+        }
+        //Use the slow but 100% accurate method to check that enough funds has been added to input
+        //Assets is iterated in the reverse order, so that CKB is last to be funded
+        for (const [name, { addChange }] of [...Object.entries(assets)].reverse()) {
+            txWithChange = addChange(txWithChange ?? tx);
+            if (!txWithChange) {
+                throw new NotEnoughFundsError(name);
+            }
         }
     }
+
     if (!txWithChange) {
         throw Error(errorNoFundingMethods);
     }
@@ -69,7 +88,6 @@ export function fund(tx: TransactionSkeletonType, assets: Assets) {
 
     return tx;
 }
-
 
 export class NotEnoughFundsError extends Error {
     readonly missingAssetName: string;
