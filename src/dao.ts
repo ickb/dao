@@ -61,7 +61,7 @@ export function daoSifter(
             deposits.push(extendCell(c, lock, h));
         } else {
             const h1 = getHeader(Uint64.unpack(c.data).toHexString(), c);
-            const since = calculateDaoEarliestSinceCompatible(h1.epoch, h.epoch).toString();
+            const since = calculateDaoEarliestSinceCompatible(h1.epoch, h.epoch).toHexString();
             withdrawalRequests.push(extendCell(c, lock, h, h1, since));
         }
     }

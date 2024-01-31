@@ -2,7 +2,7 @@ import { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/ba
 import { BI, BIish } from "@ckb-lumos/bi";
 import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
 import { Map as ImmutableMap, List, Record } from "immutable";
-import { cellDeps, headerDeps, I8Cell, since, witness } from "./cell";
+import { cellDeps, headerDeps, I8Cell, i8ScriptPadding, since, witness } from "./cell";
 import { bytes } from "@ckb-lumos/codec";
 import { parseAbsoluteEpochSince } from "@ckb-lumos/base/lib/since";
 import { Transaction as TransactionCodec, WitnessArgs } from "@ckb-lumos/base/lib/blockchain";
@@ -162,16 +162,19 @@ function addSincesFrom(
     inputSplicingIndex: number,
     inputs: List<I8Cell>
 ) {
-    // Convert tx.inputSinces to sinces, uses "0x0" for no since
-    let sinces = Array.from({ length: tx.inputs.size }, (_, index) => tx.inputSinces.get(index, "0x0"));
+    // Convert tx.inputSinces to sinces
+    const sincePadding = i8ScriptPadding[since];
+    let sinces = Array.from({ length: tx.inputs.size }, (_, index) => tx.inputSinces.get(index, sincePadding));
 
     // Convert cells to their sinces
     let newSinces: PackedSince[] = [];
     for (const c of inputs) {
         const lockSince = c.cellOutput.lock[since];
-        const typeSince = c.cellOutput.type ? c.cellOutput.type[since] : undefined;
-        if (lockSince === undefined || typeSince === undefined || lockSince === typeSince) {
-            newSinces.push(lockSince ?? typeSince ?? "0x0");//"0x0" for no since
+        const typeSince = c.cellOutput.type ? c.cellOutput.type[since] : lockSince;
+        if (lockSince === sincePadding || lockSince === typeSince) {
+            newSinces.push(typeSince);
+        } else if (typeSince === sincePadding) {
+            newSinces.push(lockSince);
         } else if (epochSinceCompare(parseAbsoluteEpochSince(lockSince), parseAbsoluteEpochSince(typeSince)) == -1) {
             newSinces.push(typeSince);
         } else {
@@ -184,7 +187,7 @@ function addSincesFrom(
 
     return tx.set("inputSinces", ImmutableMap(sinces
         .map((since, index) => [index, since] as [number, string])
-        .filter(([_, since]) => since !== "0x0")));
+        .filter(([_, since]) => since !== sincePadding)));
 }
 
 
