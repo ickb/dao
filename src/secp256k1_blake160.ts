@@ -11,7 +11,8 @@ import { prepareSigningEntries } from "@ckb-lumos/common-scripts/lib/secp256k1_b
 import { addWitnessPlaceholder } from "./transaction";
 
 export function secp256k1Blake160(privKey?: string) {
-    const privateKey = privKey ?? hexify(randomBytes(32));
+    const privateKey = privKey ?? newTestingPrivateKey();
+
     const publicKey = key.privateToPublic(privateKey);
 
     const lockScript = I8Script.from({
@@ -46,4 +47,12 @@ export function secp256k1Blake160(privKey?: string) {
         publicKey, lockScript, address,
         expander, preSigner, signer
     };
+}
+
+export function newTestingPrivateKey(suppressLogging: boolean = false) {
+    const privateKey = hexify(randomBytes(32));
+    if (!suppressLogging) {
+        console.log("New testing private key:", privateKey);
+    }
+    return privateKey;
 }
