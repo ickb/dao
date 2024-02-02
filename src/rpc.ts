@@ -5,7 +5,7 @@ import { I8Header } from "./cell";
 import { LightClientRPC } from "@ckb-lumos/light-client";
 import { CKBComponents } from "@ckb-lumos/rpc/lib/types/api";
 import { RPC } from "@ckb-lumos/rpc";
-import { scriptEq } from "./utils";
+import { scriptEq, shuffle } from "./utils";
 
 //RPC methods that work for both RPC and Light Client RPC
 
@@ -73,7 +73,7 @@ export async function getHeaderByNumber(
 
 export async function getCells<WithData extends boolean = true>(
     searchKey: CKBComponents.GetCellsSearchKey<WithData>,
-    order: CKBComponents.Order = "desc",
+    order: CKBComponents.Order | undefined = undefined,
     limit: CKBComponents.Hash = "0xffffffff",
     cursor?: CKBComponents.Hash256) {
     //Same signature for both RPC and light client RPC
@@ -82,8 +82,9 @@ export async function getCells<WithData extends boolean = true>(
     searchKey.script = { codeHash: script.codeHash, hashType: script.hashType, args: script.args };
 
     const chainInfo = getChainInfo();
-    const cc = await new RPC(chainInfo.rpcUrl).getCells(searchKey, order, limit, cursor);
-    return cc.objects.map(c => Object.freeze(<Cell>{
+    const cc = await new RPC(chainInfo.rpcUrl).getCells(searchKey, order ?? "asc", limit, cursor);
+
+    let cells = cc.objects.map(c => Object.freeze(<Cell>{
         cellOutput: {
             capacity: c.output.capacity,
             lock: scriptEq(c.output.lock, script) ? script : c.output.lock,
@@ -93,6 +94,13 @@ export async function getCells<WithData extends boolean = true>(
         outPoint: c.outPoint ?? undefined,
         blockNumber: c.blockNumber,
     }));
+
+    //Randomize cells order
+    if (order === undefined) {
+        cells = shuffle(cells);
+    }
+
+    return cells;
 }
 
 export async function getFeeRate() {

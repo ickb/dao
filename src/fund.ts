@@ -4,7 +4,7 @@ import { I8Cell, I8Header, I8Script, since } from "./cell";
 import { TransactionSkeleton, TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { ckbDelta, daoWithdrawFrom, isDao } from "./dao";
 import { addCells } from "./transaction";
-import { epochSinceCompare } from "./utils";
+import { epochSinceCompare, logSplit } from "./utils";
 
 const zero = BI.from(0);
 
@@ -131,17 +131,25 @@ export function ckbFundAdapter(
         return addPlaceholders(addCells(tx, "append", [], [changeCell]));
     }
 
+    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
+    for (const cc of logSplit(capacities)) {
+        addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", cc, []));
+    }
+
     const unavailableWithdrawalRequests: I8Cell[] = [];
-    const addFunds = capacities.map(c => (tx: TransactionSkeletonType) => addCells(tx, "append", [c], []));
     if (tipHeader && withdrawalRequests) {
-        const tipEpoch = parseEpoch(tipHeader.epoch)
+        const tipEpoch = parseEpoch(tipHeader.epoch);
+        const availableWithdrawalRequests: I8Cell[] = [];
         for (const wr of withdrawalRequests) {
             const withdrawalEpoch = parseAbsoluteEpochSince(wr.cellOutput.type![since]);
             if (epochSinceCompare(tipEpoch, withdrawalEpoch) === -1) {
                 unavailableWithdrawalRequests.push(wr);
                 continue;
             }
-            addFunds.push((tx: TransactionSkeletonType) => daoWithdrawFrom(tx, [wr]));
+            availableWithdrawalRequests.push(wr);
+        }
+        for (const wwrr of logSplit(availableWithdrawalRequests)) {
+            addFunds.push((tx: TransactionSkeletonType) => daoWithdrawFrom(tx, wwrr));
         }
     }
 

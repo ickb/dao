@@ -126,6 +126,28 @@ export function epochSinceAdd(e: EpochSinceValue, delta: EpochSinceValue): Epoch
     return { length, index, number };
 }
 
+export function logSplit<T>(array: readonly T[]) {
+    let splits: T[][] = [];
+
+    while (array.length > 0) {
+        const half = Math.floor(array.length / 2);
+        splits.push(array.slice(half));
+        array = array.slice(0, half);
+    }
+
+    return splits;
+}
+
+// Durstenfeld shuffle, see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+export function shuffle<T>(a: readonly T[]) {
+    let array = [...a];
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 // BinarySearch is translated from https://go.dev/src/sort/search.go, credits to the respective authors.
 
 // BinarySearch uses binary search to find and return the smallest index i
