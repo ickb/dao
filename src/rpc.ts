@@ -105,6 +105,7 @@ export async function getCells<WithData extends boolean = true>(
 
 export async function getFeeRate() {
     const chainInfo = getChainInfo();
+
     const rpc = new RPC(chainInfo.isLightClientRpc ? defaultRpcUrl(chainInfo.chain) : chainInfo.rpcUrl);
 
     const [feeRateStatistics6, feeRateStatistics101] = await Promise.all([
@@ -112,19 +113,14 @@ export async function getFeeRate() {
         rpc.getFeeRateStatistics("0x101")
     ]);
 
-    const median101 = feeRateStatistics101 === null ? BI.from(1000) : BI.from(feeRateStatistics101.median);
-    const median6 = feeRateStatistics6 === null ? median101 : BI.from(feeRateStatistics6.median);
+    const median101 = feeRateStatistics101 ? BI.from(feeRateStatistics101.median) : BI.from(1000);
+    const median6 = feeRateStatistics6 ? BI.from(feeRateStatistics6.median) : median101;
 
-    let res = median6.add(median6.div(10));
+    let res = median6.gt(median101) ? median6 : median101;
 
-    const lowerLimit = median101.add(median101.div(10));
-    const upperLimit = BI.from(10 ** 7)
+    //Increase by 10%
+    res = res.add(res.div(10));
 
-    if (res.lt(lowerLimit)) {
-        res = lowerLimit;
-    } else if (res.gt(upperLimit)) {
-        res = upperLimit;
-    }
     return res;
 }
 
