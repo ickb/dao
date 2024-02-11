@@ -1,12 +1,37 @@
 # Lumos Utils
 
-## TLDR: don't use it for now
+## Setup
 
-In the last few months I gained a lot of experience with Lumos and I noticed that:
+1. Download this repo in a folder of your choice:  
 
-- there is a lot of overlap in the typescript code in my various projects/issues, which is still OK.
-- every time I write a new one, I improve some parts of the boilerplate code, so then I have to manually modify all other copies, which definitely is **not OK**.
+```bash
+git clone https://github.com/ickb/lumos-utils.git
+```
 
-That's why I'm gonna turn that boilerplate code in this extensible small library.
+2. Enter into the repo folder:
 
-PS: it's likely gonna change a lot and of course it's not documented, so for now I would advise anybody else against using it.
+```bash
+cd lumos-utils
+```
+
+3. Install dependencies:
+
+```bash
+npm i
+```
+
+4. Use `npm link` to make the compiled library available:
+
+```bash
+sudo npm link
+```
+
+5. Set up continuous a process that re-compiles on changes:
+
+```bash
+tsc -w
+```
+
+## Licensing
+
+The license for this repository is the MIT License, see the [`LICENSE`](./LICENSE).
