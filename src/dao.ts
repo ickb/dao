@@ -22,7 +22,7 @@ export function daoSifter(
 ) {
     const deposits: I8Cell[] = [];
     const withdrawalRequests: I8Cell[] = [];
-    const unknowns: Cell[] = [];
+    const notDaos: Cell[] = [];
 
     const defaultDaoScript = defaultScript("DAO");
     const extendCell = (
@@ -48,7 +48,7 @@ export function daoSifter(
     for (const c of inputs) {
         const lock = accountLockExpander(c);
         if (!lock || !isDao(c)) {
-            unknowns.push(c);
+            notDaos.push(c);
             continue;
         }
 
@@ -66,7 +66,7 @@ export function daoSifter(
         }
     }
 
-    return { deposits, withdrawalRequests, unknowns };
+    return { deposits, withdrawalRequests, notDaos };
 }
 
 export const DEPOSIT_DATA = "0x0000000000000000";

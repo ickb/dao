@@ -4,26 +4,26 @@ import { defaultScript } from "./config";
 import { EpochSinceValue } from "@ckb-lumos/base/lib/since";
 import { I8Cell, I8Script } from "./cell";
 
-export function capacitiesSifter(
+export function capacitySifter(
     inputs: readonly Cell[],
     accountLockExpander: (c: Cell) => I8Script | undefined
 ) {
-    const owned: I8Cell[] = [];
-    const unknowns: Cell[] = [];
+    const capacities: I8Cell[] = [];
+    const notCapacities: Cell[] = [];
 
     for (const c of inputs) {
         if (c.cellOutput.type !== undefined || c.data !== "0x") {
-            unknowns.push(c);
+            notCapacities.push(c);
             continue;
         }
 
         const lock = accountLockExpander(c);
         if (!lock) {
-            unknowns.push(c);
+            notCapacities.push(c);
             continue;
         }
 
-        owned.push(I8Cell.from({
+        capacities.push(I8Cell.from({
             ...c,
             cellOutput: {
                 lock,
@@ -32,7 +32,7 @@ export function capacitiesSifter(
         }));
     }
 
-    return { owned, unknowns };
+    return { capacities, notCapacities };
 }
 
 export function sudtSifter(
@@ -40,22 +40,22 @@ export function sudtSifter(
     sudtType: I8Script,
     accountLockExpander: (c: Cell) => I8Script | undefined
 ) {
-    const owned: I8Cell[] = [];
-    const unknowns: Cell[] = [];
+    const sudts: I8Cell[] = [];
+    const notSudts: Cell[] = [];
 
     for (const c of inputs) {
         if (!scriptEq(c.cellOutput.type, sudtType)) {
-            unknowns.push(c);
+            notSudts.push(c);
             continue;
         }
 
         const lock = accountLockExpander(c);
         if (!lock) {
-            unknowns.push(c);
+            notSudts.push(c);
             continue;
         }
 
-        owned.push(I8Cell.from({
+        sudts.push(I8Cell.from({
             ...c,
             cellOutput: {
                 lock,
@@ -65,7 +65,22 @@ export function sudtSifter(
         }));
     }
 
-    return { owned, unknowns };
+    return { sudts, notSudts };
+}
+
+export function simpleSifter(
+    inputs: readonly Cell[],
+    sudtType: I8Script,
+    accountLockExpander: (c: Cell) => I8Script | undefined
+) {
+    const { capacities, notCapacities } = capacitySifter(inputs, accountLockExpander);
+    const { sudts, notSudts } = sudtSifter(notCapacities, sudtType, accountLockExpander);
+
+    return {
+        capacities,
+        sudts,
+        notSimples: notSudts
+    };
 }
 
 export const errorBothScriptUndefined = "Comparing two Scripts that both are undefined";
