@@ -1,14 +1,17 @@
-import { TransactionSkeletonType, sealTransaction } from "@ckb-lumos/helpers";
-import { I8Script, witness } from "./cell";
+import { TransactionSkeleton, TransactionSkeletonType, sealTransaction } from "@ckb-lumos/helpers";
+import { I8Cell, I8Script, witness } from "./cell";
 import { encodeToAddress } from "@ckb-lumos/helpers";
 import { randomBytes } from "crypto";
 import { key } from "@ckb-lumos/hd";
 import { hexify } from "@ckb-lumos/codec/lib/bytes";
 import { defaultScript } from "./config";
 import { Cell } from "@ckb-lumos/base";
-import { scriptEq } from "./utils";
+import { capacitySifter, scriptEq } from "./utils";
 import { prepareSigningEntries } from "@ckb-lumos/common-scripts/lib/secp256k1_blake160";
-import { addWitnessPlaceholder } from "./transaction";
+import { addCells, addWitnessPlaceholder } from "./transaction";
+import { BI } from "@ckb-lumos/bi";
+import { getCells, getFeeRate, sendTransaction } from "./rpc";
+import { ckbFundAdapter, fund } from "./fund";
 
 export function secp256k1Blake160(privKey?: string) {
     const privateKey = privKey ?? newTestingPrivateKey();
@@ -43,9 +46,45 @@ export function secp256k1Blake160(privKey?: string) {
         return sealTransaction(tx, [sig]);
     }
 
+    async function transfer(
+        to: I8Script,
+        ckbAmount: BI,
+        feeRate?: BI,
+        secondsTimeout: number = 600 // non-positive number means do not await for transaction to be committed
+    ) {
+        const capacities = await getCapacities();
+
+        const cell = I8Cell.from({
+            capacity: ckbAmount.toHexString(),
+            lock: to,
+        });
+
+        let tx = TransactionSkeleton();
+        tx = addCells(tx, "append", [], [cell]);
+        tx = fund(tx, ckbFundAdapter(lockScript, feeRate ?? await getFeeRate(), preSigner, capacities));
+        return sendTransaction(signer(tx), secondsTimeout);
+    }
+
+    async function getCapacities() {
+        const { capacities } = capacitySifter(
+            await getCells({
+                script: lockScript,
+                scriptType: "lock",
+                filter: {
+                    scriptLenRange: ["0x0", "0x1"],
+                    outputDataLenRange: ["0x0", "0x1"],
+                },
+                scriptSearchMode: "exact"
+            }),
+            expander
+        );
+        return capacities;
+    }
+
     return {
         publicKey, lockScript, address,
-        expander, preSigner, signer
+        expander, preSigner, signer,
+        transfer, getCapacities
     };
 }
 
@@ -56,3 +95,5 @@ export function newTestingPrivateKey(suppressLogging: boolean = false) {
     }
     return privateKey;
 }
+
+export const genesisDevnetKey = "0xd00c06bfd800d27397002dca6fb0993d5ba6399b4238b2f29ee9deb97593d2bc";

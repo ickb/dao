@@ -126,7 +126,10 @@ export async function getFeeRate() {
 
 export const errorUnexpectedTxState = "Unexpected transaction state";
 export const errorTimeOut = "Transaction timed out";
-export async function sendTransaction(tx: Transaction, secondsTimeout: number = 600) {
+export async function sendTransaction(
+    tx: Transaction,
+    secondsTimeout: number = 600 // non-positive number means do not await for transaction to be committed
+) {
     //Same signature for both RPC and light client RPC
     const chainInfo = getChainInfo();
     const rpc = new RPC(chainInfo.rpcUrl);
