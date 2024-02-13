@@ -106,6 +106,10 @@ export async function getCells<WithData extends boolean = true>(
 export async function getFeeRate() {
     const chainInfo = getChainInfo();
 
+    if (chainInfo.chain === "devnet") {
+        return BI.from(1000);
+    }
+
     const rpc = new RPC(chainInfo.isLightClientRpc ? defaultRpcUrl(chainInfo.chain) : chainInfo.rpcUrl);
 
     const [feeRateStatistics6, feeRateStatistics101] = await Promise.all([
