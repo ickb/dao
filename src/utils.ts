@@ -123,7 +123,11 @@ export function epochSinceCompare(
     return 0;
 }
 
+const errorZeroEpochLength = "Zero EpochSinceValue length";
 export function epochSinceAdd(e: EpochSinceValue, delta: EpochSinceValue): EpochSinceValue {
+    if (e.length === 0 || delta.length === 0) {
+        throw Error(errorZeroEpochLength);
+    }
     if (e.length !== delta.length) {
         delta = {
             length: e.length,
