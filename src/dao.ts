@@ -10,7 +10,7 @@ import {
 } from "@ckb-lumos/common-scripts/lib/dao";
 import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell";
 import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction";
-import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
+import { binarySearch, epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
 
 const zero = BI.from(0);
 
@@ -151,32 +151,40 @@ export function daoRequestWithdrawalWith(
     tipHeader: I8Header,
     maxWithdrawalAmount: BI,
     maxWithdrawalCells: number = Number.POSITIVE_INFINITY,
-    minLock: EpochSinceValue = { length: 16, index: 1, number: 0 },// 1/8 epoch (~ 15 minutes)
-    maxLock: EpochSinceValue = { length: 4, index: 1, number: 0 }// 1/4 epoch (~ 1 hour)
+    minLocking?: EpochSinceValue,
+    additionalMaxLocking?: EpochSinceValue
 ) {
-    const withdrawalRequestDao = tipHeader.dao;
-
-    //Let's fast forward the tip header of minLock epoch to avoid withdrawals having to wait one more month
-    const tipEpoch = parseEpoch(tipHeader.epoch);
-    const withdrawalRequestEpoch = epochSinceAdd(tipEpoch, minLock);
-    const maxWithdrawalEpoch = epochSinceAdd(tipEpoch, maxLock);
-
-    //Filter deposits as requested and sort by minimum withdrawal epoch
-    const processedDeposits = deposits
+    let extendedDeposits = deposits
         .filter(d => maxWithdrawalAmount.gte(d.cellOutput.capacity))
         .map(d => Object.freeze({
             deposit: d,
-            withdrawalEpoch: withdrawalEpochEstimation(d, withdrawalRequestEpoch),
-            withdrawalAmount: withdrawalAmountEstimation(d, withdrawalRequestDao)
-        }))
-        .filter(({ withdrawalAmount }) => maxWithdrawalAmount.gte(withdrawalAmount))
-        .filter(d => epochSinceCompare(d.withdrawalEpoch, maxWithdrawalEpoch) <= 0)
-        .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch));
+            withdrawalAmount: withdrawalAmountEstimation(d, tipHeader.dao),
+            withdrawalEpoch: { length: 1, index: 0, number: 0 },//Placeholder for type purposes
+        }));
 
-    //It does NOT attempt to solve the Knapsack problem, it just withdraw the earliest deposits under budget
+    if (minLocking) {
+        //Let's fast forward the tip header of minLockingPeriod to avoid withdrawals having to wait 180 more epochs
+        const withdrawalRequestEpoch = epochSinceAdd(parseEpoch(tipHeader.epoch), minLocking);
+        extendedDeposits = extendedDeposits
+            .filter(({ withdrawalAmount }) => maxWithdrawalAmount.gte(withdrawalAmount))
+            .map(({ deposit, withdrawalAmount }) => Object.freeze({
+                deposit,
+                withdrawalAmount,
+                withdrawalEpoch: withdrawalEpochEstimation(deposit, withdrawalRequestEpoch),
+            }))
+            .sort((a, b) => epochSinceCompare(a.withdrawalEpoch, b.withdrawalEpoch));
+
+        if (additionalMaxLocking) {
+            const maxWithdrawalEpoch = epochSinceAdd(withdrawalRequestEpoch, additionalMaxLocking);
+            extendedDeposits = extendedDeposits
+                .filter(d => epochSinceCompare(d.withdrawalEpoch, maxWithdrawalEpoch) <= 0);
+        }
+    }
+
+    //This does NOT attempt to solve the Knapsack problem, it just withdraw the earliest deposits under budget
     let currentWithdrawalAmount = zero;
     const optimalDeposits: I8Cell[] = []
-    for (const { deposit, withdrawalAmount } of processedDeposits) {
+    for (const { deposit, withdrawalAmount } of extendedDeposits) {
         const newWithdrawalAmount = currentWithdrawalAmount.add(withdrawalAmount);
         if (newWithdrawalAmount.gt(maxWithdrawalAmount)) {
             continue;
