@@ -16,8 +16,8 @@ const chain2RpcUrl = Object.freeze({
 
 export type Chain = keyof typeof chain2RpcUrl;
 
-export function isChain(x: string): x is Chain {
-    return chain2RpcUrl.hasOwnProperty(x);
+export function isChain(x: string | undefined): x is Chain {
+    return x ? chain2RpcUrl.hasOwnProperty(x) : false;
 }
 
 export function defaultRpcUrl(chain: Chain) {
