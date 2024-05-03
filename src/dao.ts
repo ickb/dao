@@ -10,7 +10,7 @@ import {
 } from "@ckb-lumos/common-scripts/lib/dao";
 import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell";
 import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction";
-import { binarySearch, epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
+import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
 
 const zero = BI.from(0);
 
