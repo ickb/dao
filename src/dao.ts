@@ -1,16 +1,18 @@
-import { Cell, Hexadecimal, PackedDao, PackedSince } from "@ckb-lumos/base";
-import { BI, BIish } from "@ckb-lumos/bi";
-import { TransactionSkeletonType } from "@ckb-lumos/helpers";
-import { defaultScript } from "./config";
-import { hexify } from "@ckb-lumos/codec/lib/bytes";
-import { Uint64 } from "@ckb-lumos/codec/lib/number/uint";
-import { EpochSinceValue, generateHeaderEpoch, parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since";
+import type { Cell, Hexadecimal, PackedDao, PackedSince } from "@ckb-lumos/base";
+import { BI, type BIish } from "@ckb-lumos/bi";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { defaultScript } from "./config.js";
+import { hexify } from "@ckb-lumos/codec/lib/bytes.js";
+import { Uint64 } from "@ckb-lumos/codec/lib/number/uint.js";
+import {
+    type EpochSinceValue, generateHeaderEpoch, parseAbsoluteEpochSince, parseEpoch
+} from "@ckb-lumos/base/lib/since.js";
 import {
     calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
-} from "@ckb-lumos/common-scripts/lib/dao";
-import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell";
-import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction";
-import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils";
+} from "@ckb-lumos/common-scripts/lib/dao.js";
+import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell.js";
+import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction.js";
+import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils.js";
 
 const zero = BI.from(0);
 

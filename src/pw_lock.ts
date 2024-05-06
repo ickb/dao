@@ -1,11 +1,13 @@
-import { default as createKeccak } from "keccak";
+import create from "keccak";
 import { bytes } from "@ckb-lumos/codec";
-import { Cell, blockchain } from "@ckb-lumos/base";
-import { TransactionSkeletonType, createTransactionFromSkeleton, encodeToAddress } from "@ckb-lumos/helpers";
+import { blockchain } from "@ckb-lumos/base";
+import type { Cell } from "@ckb-lumos/base";
+import { createTransactionFromSkeleton, encodeToAddress } from "@ckb-lumos/helpers";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { createP2PKHMessageGroup } from "@ckb-lumos/common-scripts";
-import { I8Script, witness } from "./cell";
-import { defaultScript } from "./config";
-import { scriptEq } from "./utils";
+import { I8Script, witness } from "./cell.js";
+import { defaultScript } from "./config.js";
+import { scriptEq } from "./utils.js";
 
 export interface EthereumRpc {
     (payload: { method: 'personal_sign'; params: [string /*from*/, string /*message*/] }): Promise<string>;
@@ -44,7 +46,7 @@ export function pwLock(provider?: EthereumProvider) {
 
     async function signer(transaction: TransactionSkeletonType, provider?: EthereumProvider) {
         // just like P2PKH: https://github.com/nervosnetwork/ckb-system-scripts/wiki/How-to-sign-transaction    
-        const keccak = createKeccak("keccak256");
+        const keccak = create.default("keccak256");
 
         const messageForSigning = createP2PKHMessageGroup(transaction, [lockScript], {
             hasher: {

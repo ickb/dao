@@ -2,14 +2,15 @@
   "name": "@ickb/lumos-utils",
   "version": "1.3.0",
   "description": "A small utility framework built on top of ckb-js/lumos",
-  "main": "lib/index.js",
-  "types": "lib/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc"
   },
   "files": [
-    "/lib"
+    "/dist"
   ],
+  "type": "module",
   "keywords": [],
   "author": "phroi",
   "license": "MIT",

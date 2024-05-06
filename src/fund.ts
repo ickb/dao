@@ -1,10 +1,10 @@
-import { BI, BIish } from "@ckb-lumos/bi";
-import { parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since";
-import { I8Cell, I8Header, I8Script, since } from "./cell";
-import { TransactionSkeleton, TransactionSkeletonType } from "@ckb-lumos/helpers";
-import { ckbDelta, daoWithdrawFrom, isDao } from "./dao";
-import { addCells } from "./transaction";
-import { epochSinceCompare, logSplit } from "./utils";
+import { BI, type BIish } from "@ckb-lumos/bi";
+import { parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since.js";
+import { I8Cell, I8Header, I8Script, since } from "./cell.js";
+import { TransactionSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { ckbDelta, daoWithdrawFrom, isDao } from "./dao.js";
+import { addCells } from "./transaction.js";
+import { epochSinceCompare, logSplit } from "./utils.js";
 
 const zero = BI.from(0);
 

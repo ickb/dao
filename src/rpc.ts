@@ -1,11 +1,11 @@
-import { Cell, Hexadecimal, OutPoint, Header, Transaction, Hash } from "@ckb-lumos/base";
+import type { Cell, Hexadecimal, OutPoint, Header, Transaction, Hash } from "@ckb-lumos/base";
 import { BI } from "@ckb-lumos/bi";
-import { defaultRpcUrl, getChainInfo } from "./config";
-import { I8Header } from "./cell";
+import { defaultRpcUrl, getChainInfo } from "./config.js";
+import { I8Header } from "./cell.js";
 import { LightClientRPC } from "@ckb-lumos/light-client";
-import { CKBComponents } from "@ckb-lumos/rpc/lib/types/api";
+import { CKBComponents } from "@ckb-lumos/rpc/lib/types/api.js";
 import { RPC } from "@ckb-lumos/rpc";
-import { scriptEq, shuffle } from "./utils";
+import { scriptEq, shuffle } from "./utils.js";
 
 //RPC methods that work for both RPC and Light Client RPC
 

@@ -1,12 +1,13 @@
 import { BI } from "@ckb-lumos/bi"
-import { HashType, Hexadecimal, OutPoint, blockchain } from "@ckb-lumos/base";
+import type { HashType, Hexadecimal, OutPoint } from "@ckb-lumos/base";
+import { blockchain } from "@ckb-lumos/base";
 import { vector } from "@ckb-lumos/codec/lib/molecule";
+import type { Config, ScriptConfigs, ScriptConfig } from "@ckb-lumos/config-manager/lib";
 import {
-    Config, ScriptConfigs, ScriptConfig, generateGenesisScriptConfigs,
-    predefined, getConfig, initializeConfig as unadaptedInitializeConfig
-} from "@ckb-lumos/config-manager/lib";
-import { I8Cell, I8Script, I8OutPoint, I8CellDep, cellDeps, i8ScriptPadding } from "./cell";
-import { getGenesisBlock, getTransaction } from "./rpc";
+    generateGenesisScriptConfigs, predefined, getConfig, initializeConfig as unadaptedInitializeConfig
+} from "@ckb-lumos/config-manager";
+import { I8Cell, I8Script, I8OutPoint, I8CellDep, cellDeps, i8ScriptPadding } from "./cell.js";
+import { getGenesisBlock, getTransaction } from "./rpc.js";
 
 const chain2RpcUrl = Object.freeze({
     mainnet: "https://rpc.ankr.com/nervos_ckb",

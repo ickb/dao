@@ -1,13 +1,13 @@
-import { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/base";
-import { BI, BIish } from "@ckb-lumos/bi";
-import { TransactionSkeletonType, createTransactionFromSkeleton } from "@ckb-lumos/helpers";
+import type { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/base";
+import { BI, type BIish } from "@ckb-lumos/bi";
+import { createTransactionFromSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { Map as ImmutableMap, List, Record } from "immutable";
-import { cellDeps, headerDeps, I8Cell, i8ScriptPadding, since, witness } from "./cell";
+import { cellDeps, headerDeps, I8Cell, i8ScriptPadding, since, witness } from "./cell.js";
 import { bytes } from "@ckb-lumos/codec";
-import { parseAbsoluteEpochSince } from "@ckb-lumos/base/lib/since";
-import { Transaction as TransactionCodec, WitnessArgs } from "@ckb-lumos/base/lib/blockchain";
-import { hexify } from "@ckb-lumos/codec/lib/bytes";
-import { epochSinceCompare, scriptEq } from "./utils";
+import { parseAbsoluteEpochSince } from "@ckb-lumos/base/lib/since.js";
+import { Transaction as TransactionCodec, WitnessArgs } from "@ckb-lumos/base/lib/blockchain.js";
+import { hexify } from "@ckb-lumos/codec/lib/bytes.js";
+import { epochSinceCompare, scriptEq } from "./utils.js";
 
 export const errorDifferentIOFixedEntries = "Unable to modify entries without messing up fixed entries";
 export const errorDifferentIOLength = "Input and output have different length";

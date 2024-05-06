@@ -1,8 +1,8 @@
-import { Script, Cell } from "@ckb-lumos/base";
 import { BI } from "@ckb-lumos/bi";
-import { defaultScript } from "./config";
-import { EpochSinceValue } from "@ckb-lumos/base/lib/since";
-import { I8Cell, I8Script } from "./cell";
+import { defaultScript } from "./config.js";
+import { I8Cell, I8Script } from "./cell.js";
+import type { Cell, Script } from "@ckb-lumos/base";
+import type { EpochSinceValue } from "@ckb-lumos/base/lib/since.js";
 
 export function capacitySifter(
     inputs: readonly Cell[],

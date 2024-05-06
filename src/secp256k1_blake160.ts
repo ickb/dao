@@ -1,17 +1,18 @@
-import { TransactionSkeleton, TransactionSkeletonType, sealTransaction } from "@ckb-lumos/helpers";
-import { I8Cell, I8Script, witness } from "./cell";
+import { TransactionSkeleton, sealTransaction } from "@ckb-lumos/helpers";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { I8Cell, I8Script, witness } from "./cell.js";
 import { encodeToAddress } from "@ckb-lumos/helpers";
 import { randomBytes } from "crypto";
 import { key } from "@ckb-lumos/hd";
-import { hexify } from "@ckb-lumos/codec/lib/bytes";
-import { defaultScript } from "./config";
-import { Cell } from "@ckb-lumos/base";
-import { capacitySifter, scriptEq } from "./utils";
-import { prepareSigningEntries } from "@ckb-lumos/common-scripts/lib/secp256k1_blake160";
-import { addCells, addWitnessPlaceholder } from "./transaction";
+import { hexify } from "@ckb-lumos/codec/lib/bytes.js";
+import { defaultScript } from "./config.js";
+import type { Cell } from "@ckb-lumos/base";
+import { capacitySifter, scriptEq } from "./utils.js";
+import { prepareSigningEntries } from "@ckb-lumos/common-scripts/lib/secp256k1_blake160.js";
+import { addCells, addWitnessPlaceholder } from "./transaction.js";
 import { BI } from "@ckb-lumos/bi";
-import { getCells, getFeeRate, sendTransaction } from "./rpc";
-import { ckbFundAdapter, fund } from "./fund";
+import { getCells, getFeeRate, sendTransaction } from "./rpc.js";
+import { ckbFundAdapter, fund } from "./fund.js";
 
 export function secp256k1Blake160(privKey?: string) {
     const privateKey = privKey ?? newTestingPrivateKey();

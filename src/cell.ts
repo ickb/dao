@@ -1,10 +1,10 @@
-import {
+import type {
     Hash, Header, HexNumber, HexString, Script, OutPoint,
     PackedSince, Cell, DepType, CellDep, HashType
 } from "@ckb-lumos/base";
 import { BI } from "@ckb-lumos/bi";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
-import { CellOutput } from "@ckb-lumos/ckb-indexer/lib/indexerType";
+import type { CellOutput } from "@ckb-lumos/ckb-indexer/lib/indexerType.js";
 
 //Declarations of immutable data structures
 export const immutable = Symbol("immutable");
