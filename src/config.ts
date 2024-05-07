@@ -1,13 +1,9 @@
-import { BI } from "@ckb-lumos/bi"
-import type { HashType, Hexadecimal, OutPoint } from "@ckb-lumos/base";
-import { blockchain } from "@ckb-lumos/base";
-import { vector } from "@ckb-lumos/codec/lib/molecule";
 import type { Config, ScriptConfigs, ScriptConfig } from "@ckb-lumos/config-manager/lib";
 import {
     generateGenesisScriptConfigs, predefined, getConfig, initializeConfig as unadaptedInitializeConfig
 } from "@ckb-lumos/config-manager";
-import { I8Cell, I8Script, I8OutPoint, I8CellDep, cellDeps, i8ScriptPadding } from "./cell.js";
-import { getGenesisBlock, getTransaction } from "./rpc.js";
+import { I8Script, I8OutPoint, I8CellDep, cellDeps, i8ScriptPadding } from "./cell.js";
+import { getGenesisBlock } from "./rpc.js";
 
 const chain2RpcUrl = Object.freeze({
     mainnet: "https://rpc.ankr.com/nervos_ckb",
@@ -163,110 +159,4 @@ export function serializeConfig(config: Config) {
         });
     }
     return JSON.stringify({ PREFIX: config.PREFIX, SCRIPTS: Object.freeze(scripts) }, undefined, 2);
-}
-
-export interface DeployScriptData {
-    name: string;
-    hexData: Hexadecimal;
-    codeHash: Hexadecimal;
-    hashType: HashType;
-}
-
-export async function deploy(
-    scriptData: readonly DeployScriptData[],
-    commit: (cells: readonly I8Cell[]) => Promise<I8OutPoint[]>,
-    lock: I8Script = i8ScriptPadding,
-    type?: I8Script
-) {
-    if (lock === i8ScriptPadding) {
-        lock = defaultScript("SECP256K1_BLAKE160");
-    }
-
-    const dataCells: I8Cell[] = [];
-    for (const { hexData: data } of scriptData) {
-        dataCells.push(I8Cell.from({ lock, type, data }));
-    }
-
-    const outPoints = await commit(dataCells);
-    const newScriptConfig: ScriptConfigs = {};
-    const oldConfig = getConfig();
-    scriptData.forEach(({ name, codeHash, hashType }, i) => {
-        newScriptConfig[name] = new ScriptConfigAdapter(I8Script.from({
-            ...i8ScriptPadding,
-            codeHash,
-            hashType,
-            [cellDeps]: [I8CellDep.from({ outPoint: outPoints[i], depType: "code" })]
-        }))
-    });
-
-    initializeConfig({
-        PREFIX: oldConfig.PREFIX,
-        SCRIPTS: { ...oldConfig.SCRIPTS, ...newScriptConfig }
-    });
-
-    return getConfig();
-}
-
-async function _getCellData(outPoint: I8OutPoint) {
-    const index = BI.from(outPoint.index).toNumber();
-    const t = (await getTransaction(outPoint.txHash)).transaction;
-    return t.outputsData.at(index) ?? "0x";
-}
-
-export const errorScriptNotFound = "Script not found in Config";
-export async function createDepGroup(
-    scriptNames: readonly string[],
-    commit: (cells: readonly I8Cell[]) => Promise<I8OutPoint[]>,
-    lock: I8Script = i8ScriptPadding,
-    type?: I8Script,
-    getCellData: (outPoint: I8OutPoint) => Promise<string> = _getCellData
-) {
-    if (lock === i8ScriptPadding) {
-        lock = defaultScript("SECP256K1_BLAKE160");
-    }
-
-    const outPointsCodec = vector(blockchain.OutPoint);
-    const serializeOutPoint = (p: OutPoint) => `${p.txHash}-${p.index}`;
-    const serializedOutPoint2OutPoint: Map<string, I8OutPoint> = new Map();
-    for (const name of scriptNames) {
-        const s = defaultScript(name);
-        if (s === undefined) {
-            throw Error(errorScriptNotFound);
-        }
-        for (const cellDep of s[cellDeps]) {
-            if (cellDep.depType === "code") {
-                serializedOutPoint2OutPoint.set(serializeOutPoint(cellDep.outPoint), cellDep.outPoint);
-            } else { //depGroup
-                const cellData = await getCellData(cellDep.outPoint);
-                for (const o_ of outPointsCodec.unpack(cellData)) {
-                    const o = I8OutPoint.from({ ...o_, index: BI.from(o_.index).toHexString() });
-                    serializedOutPoint2OutPoint.set(serializeOutPoint(o), o);
-                }
-            }
-        }
-    }
-
-    const packedOutPoints = outPointsCodec.pack([...serializedOutPoint2OutPoint.values()]);
-    const data = "0x" + Buffer.from(packedOutPoints).toString('hex');
-    const cell = I8Cell.from({ lock, type, data });
-    const [outPoint] = await commit([cell]);
-
-    const newScriptConfig: ScriptConfigs = {};
-    for (const name of scriptNames) {
-        const s = defaultScript(name);
-        newScriptConfig[name] = new ScriptConfigAdapter(
-            I8Script.from({
-                ...s,
-                [cellDeps]: [I8CellDep.from({ outPoint, depType: "depGroup" })]
-            })
-        );
-    }
-
-    const oldConfig = getConfig();
-    initializeConfig({
-        PREFIX: oldConfig.PREFIX,
-        SCRIPTS: { ...oldConfig.SCRIPTS, ...newScriptConfig }
-    });
-
-    return getConfig();
 }
