@@ -6,5 +6,4 @@ export * from './pw_lock.js';
 export * from './rpc.js';
 export * from './secp256k1_blake160.js';
 export * from './transaction.js';
-export * from './uint.js';
 export * from './utils.js';
