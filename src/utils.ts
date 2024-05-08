@@ -6,7 +6,7 @@ import type { EpochSinceValue } from "@ckb-lumos/base/lib/since.js";
 
 export function capacitySifter(
     inputs: readonly Cell[],
-    accountLockExpander: (c: Cell) => I8Script | undefined
+    lockExpander: (c: Cell) => I8Script | undefined
 ) {
     const capacities: I8Cell[] = [];
     const notCapacities: Cell[] = [];
@@ -17,7 +17,7 @@ export function capacitySifter(
             continue;
         }
 
-        const lock = accountLockExpander(c);
+        const lock = lockExpander(c);
         if (!lock) {
             notCapacities.push(c);
             continue;
@@ -35,51 +35,51 @@ export function capacitySifter(
     return { capacities, notCapacities };
 }
 
-export function sudtSifter(
+export function typeSifter(
     inputs: readonly Cell[],
-    sudtType: I8Script,
-    accountLockExpander: (c: Cell) => I8Script | undefined
+    type: I8Script,
+    lockExpander: (c: Cell) => I8Script | undefined
 ) {
-    const sudts: I8Cell[] = [];
-    const notSudts: Cell[] = [];
+    const types: I8Cell[] = [];
+    const notTypes: Cell[] = [];
 
     for (const c of inputs) {
-        if (!scriptEq(c.cellOutput.type, sudtType)) {
-            notSudts.push(c);
+        if (!scriptEq(c.cellOutput.type, type)) {
+            notTypes.push(c);
             continue;
         }
 
-        const lock = accountLockExpander(c);
+        const lock = lockExpander(c);
         if (!lock) {
-            notSudts.push(c);
+            notTypes.push(c);
             continue;
         }
 
-        sudts.push(I8Cell.from({
+        types.push(I8Cell.from({
             ...c,
             cellOutput: {
                 lock,
-                type: sudtType,
+                type: type,
                 capacity: c.cellOutput.capacity
             }
         }));
     }
 
-    return { sudts, notSudts };
+    return { types, notTypes };
 }
 
 export function simpleSifter(
     inputs: readonly Cell[],
-    sudtType: I8Script,
+    type: I8Script,
     accountLockExpander: (c: Cell) => I8Script | undefined
 ) {
     const { capacities, notCapacities } = capacitySifter(inputs, accountLockExpander);
-    const { sudts, notSudts } = sudtSifter(notCapacities, sudtType, accountLockExpander);
+    const { types, notTypes } = typeSifter(notCapacities, type, accountLockExpander);
 
     return {
         capacities,
-        sudts,
-        notSimples: notSudts
+        types,
+        notSimples: notTypes
     };
 }
 
