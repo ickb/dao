@@ -4,6 +4,10 @@ import { I8Cell, I8Script } from "./cell.js";
 import type { Cell, Script } from "@ckb-lumos/base";
 import type { EpochSinceValue } from "@ckb-lumos/base/lib/since.js";
 
+export function lockExpanderFrom(s: I8Script) {
+    return (c: Cell) => scriptEq(c.cellOutput.lock, s) ? s : undefined;
+}
+
 export function capacitySifter(
     inputs: readonly Cell[],
     lockExpander: (c: Cell) => I8Script | undefined

@@ -7,7 +7,7 @@ import { key } from "@ckb-lumos/hd";
 import { hexify } from "@ckb-lumos/codec/lib/bytes.js";
 import { defaultScript } from "./config.js";
 import type { Cell } from "@ckb-lumos/base";
-import { capacitySifter, scriptEq } from "./utils.js";
+import { capacitySifter, scriptEq, lockExpanderFrom } from "./utils.js";
 import { prepareSigningEntries } from "@ckb-lumos/common-scripts/lib/secp256k1_blake160.js";
 import { addCells, addWitnessPlaceholder } from "./transaction.js";
 import { BI } from "@ckb-lumos/bi";
@@ -27,13 +27,7 @@ export function secp256k1Blake160(privKey?: string) {
 
     const address = encodeToAddress(lockScript);
 
-    function expander(c: Cell) {
-        if (!scriptEq(c.cellOutput.lock, lockScript)) {
-            return undefined;
-        }
-
-        return lockScript
-    }
+    const expander = lockExpanderFrom(lockScript);
 
     function preSigner(tx: TransactionSkeletonType) {
         return addWitnessPlaceholder(tx, lockScript);
