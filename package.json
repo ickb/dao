@@ -16,7 +16,6 @@
   "license": "MIT",
   "dependencies": {
     "@ckb-lumos/base": "^0.22.2",
-    "@ckb-lumos/bi": "^0.22.2",
     "@ckb-lumos/ckb-indexer": "^0.22.2",
     "@ckb-lumos/codec": "^0.22.2",
     "@ckb-lumos/common-scripts": "^0.22.2",

@@ -2,7 +2,6 @@ import type {
     Hash, Header, HexNumber, HexString, Script, OutPoint,
     PackedSince, Cell, DepType, CellDep, HashType
 } from "@ckb-lumos/base";
-import { BI } from "@ckb-lumos/bi";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import type { CellOutput } from "@ckb-lumos/ckb-indexer/lib/indexerType.js";
 
@@ -98,7 +97,7 @@ export class I8Cell implements I8Cellable {
         this.blockHash = i.blockHash;
         this.blockNumber = i.blockNumber;
         this.txIndex = i.txIndex;
-        if (BI.from(capacity).lte(0)) {
+        if (BigInt(capacity) < 0n) {
             capacity = minimalCellCapacityCompatible(this, { validate: false }).toHexString();
             this.cellOutput = I8CellOutput.from({ capacity, lock, type });
         }

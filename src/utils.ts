@@ -1,8 +1,13 @@
-import { BI } from "@ckb-lumos/bi";
 import { defaultScript } from "./config.js";
 import { I8Cell, I8Script } from "./cell.js";
 import type { Cell, Script } from "@ckb-lumos/base";
 import type { EpochSinceValue } from "@ckb-lumos/base/lib/since.js";
+
+export const ckbInShannons = 100000000n;
+
+export function hex(n: number | BigInt) {
+    return "0x" + n.toString(16);
+}
 
 export function lockExpanderFrom(s: I8Script) {
     return (c: Cell) => scriptEq(c.cellOutput.lock, s) ? s : undefined;
@@ -115,12 +120,12 @@ export function epochSinceCompare(
         return 1;
     }
 
-    const v0 = BI.from(e0.index).mul(e1.length);
-    const v1 = BI.from(e1.index).mul(e0.length);
-    if (v0.lt(v1)) {
+    const v0 = e0.index * e1.length;
+    const v1 = e1.index * e0.length;
+    if (v0 < v1) {
         return -1;
     }
-    if (v0.gt(v1)) {
+    if (v0 > v1) {
         return 1;
     }
 

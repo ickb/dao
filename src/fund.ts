@@ -1,12 +1,9 @@
-import { BI, type BIish } from "@ckb-lumos/bi";
 import { parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since.js";
 import { I8Cell, I8Header, I8Script, since } from "./cell.js";
 import { TransactionSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { ckbDelta, daoWithdrawFrom, isDao } from "./dao.js";
 import { addCells } from "./transaction.js";
-import { epochSinceCompare, logSplit } from "./utils.js";
-
-const zero = BI.from(0);
+import { epochSinceCompare, hex, logSplit } from "./utils.js";
 
 export const errorNoFundingMethods = "No funding method specified";
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
@@ -17,7 +14,7 @@ export function fund(
     tx: TransactionSkeletonType,
     assets: Assets,
     useAll: boolean = false,
-    minChanges: Readonly<{ [name: string]: BI }> = {}
+    minChanges: Readonly<{ [name: string]: bigint }> = {}
 ) {
     for (const name of Object.keys(minChanges)) {
         if (!assets[name]) {
@@ -34,7 +31,7 @@ export function fund(
         //Assets is iterated in the reverse order, so that CKB is last to be funded
         for (const [name, { getDelta, addChange: ac, addFunds: af }] of [...Object.entries(assets)].reverse()) {
             txWithChange = undefined;
-            const minChange = minChanges[name] ?? zero;
+            const minChange = minChanges[name] ?? 0n;
             addChanges.push((tx: TransactionSkeletonType) => ac(tx, minChange));
             addFunds.push(...af);
             addFunds.push((tx: TransactionSkeletonType) => tx);
@@ -44,8 +41,8 @@ export function fund(
                 tx = addFund(tx);
 
                 //Try a quick estimation of how many funds it would take to even out input and output balances
-                balanceEstimation = balanceEstimation.add(getDelta(addFund(TransactionSkeleton())));
-                if (balanceEstimation.lt(minChange)) {
+                balanceEstimation += getDelta(addFund(TransactionSkeleton()));
+                if (balanceEstimation < minChange) {
                     continue;
                 }
 
@@ -76,7 +73,7 @@ export function fund(
         //Use the slow but 100% accurate method to check that enough funds has been added to input
         //Assets is iterated in the reverse order, so that CKB is last to be funded
         for (const [name, { addChange }] of [...Object.entries(assets)].reverse()) {
-            txWithChange = addChange(txWithChange ?? tx, minChanges[name] ?? zero);
+            txWithChange = addChange(txWithChange ?? tx, minChanges[name] ?? 0n);
             if (!txWithChange) {
                 throw new NotEnoughFundsError(name);
             }
@@ -90,7 +87,7 @@ export function fund(
 
     //Double check that all assets are accounted for correctly
     for (const [_, { getDelta }] of Object.entries(assets)) {
-        if (!getDelta(tx).eq(zero)) {
+        if (getDelta(tx) != 0n) {
             throw Error(errorIncorrectChange);
         }
     }
@@ -117,7 +114,7 @@ export class NotEnoughFundsError extends Error {
 
 export function ckbFundAdapter(
     accountLock: I8Script,
-    feeRate: BIish,
+    feeRate: bigint,
     addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
     capacities: readonly I8Cell[],
     tipHeader?: I8Header,
@@ -125,7 +122,7 @@ export function ckbFundAdapter(
 ) {
     const getDelta = (tx: TransactionSkeletonType) => ckbDelta(tx, feeRate);
 
-    const addChange = (tx: TransactionSkeletonType, minChange: BI) => {
+    const addChange = (tx: TransactionSkeletonType, minChange: bigint) => {
         if (tx.equals(TransactionSkeleton())) {
             return tx;
         }
@@ -133,14 +130,14 @@ export function ckbFundAdapter(
         let changeCell = I8Cell.from({ lock: accountLock });
         const txWithPlaceholders = addPlaceholders(addCells(tx, "append", [], [changeCell]));
         const delta = getDelta(txWithPlaceholders);
-        const capacity = delta.add(changeCell.cellOutput.capacity);
-        if (delta.lt(zero) || capacity.lt(minChange)) {
+        const capacity = delta + BigInt(changeCell.cellOutput.capacity);
+        if (delta < 0n || capacity < minChange) {
             return undefined;
         }
 
         changeCell = I8Cell.from({
             ...changeCell,
-            capacity: capacity.toHexString()
+            capacity: hex(capacity)
         });
         return addPlaceholders(addCells(tx, "append", [], [changeCell]));
     }
@@ -174,11 +171,11 @@ export function ckbFundAdapter(
 
 export type Assets = Readonly<{
     [name: string]: Readonly<{// All caps names like CKB, ICKB_UDT ...
-        getDelta: (tx: TransactionSkeletonType) => BI
-        addChange: (tx: TransactionSkeletonType, minChange: BI) => TransactionSkeletonType | undefined
+        getDelta: (tx: TransactionSkeletonType) => bigint
+        addChange: (tx: TransactionSkeletonType, minChange: bigint) => TransactionSkeletonType | undefined
         addFunds: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
-        availableBalance: BI,
-        balance: BI,
+        availableBalance: bigint,
+        balance: bigint,
     }>
 }>;
 
@@ -186,8 +183,8 @@ export const errorDuplicatedAsset = "Asset already exists";
 export function addAsset(
     assets: Assets,
     name: string,// All caps names like CKB, ICKB_UDT ...
-    getDelta: (tx: TransactionSkeletonType) => BI,
-    addChange: (tx: TransactionSkeletonType, minChange: BI) => TransactionSkeletonType | undefined,
+    getDelta: (tx: TransactionSkeletonType) => bigint,
+    addChange: (tx: TransactionSkeletonType, minChange: bigint) => TransactionSkeletonType | undefined,
     addFunds?: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
     unavailableFunds?: readonly TransactionSkeletonType[]
 ): Assets {
@@ -201,8 +198,8 @@ export function addAsset(
             getDelta,
             addChange,
             addFunds: Object.freeze([]),
-            availableBalance: zero,
-            balance: zero,
+            availableBalance: 0n,
+            balance: 0n,
         })
     });
 
@@ -226,13 +223,13 @@ export function addAssetsFunds(
     for (const tx of unavailableFunds ?? []) {
         for (const [name, { getDelta, balance }] of Object.entries(mutableAssets)) {
             const delta = getDelta(tx);
-            if (delta.lt(zero)) {
+            if (delta < 0n) {
                 throw Error(errorNonPositiveBalance);
             }
-            if (delta.eq(zero)) {
+            if (delta == 0n) {
                 continue;
             }
-            mutableAssets[name].balance = balance.add(delta);
+            mutableAssets[name].balance += delta;
         }
     }
 
@@ -241,15 +238,15 @@ export function addAssetsFunds(
         let lastNonZeroName = "";
         for (const [name, { getDelta, availableBalance, balance }] of Object.entries(mutableAssets)) {
             const delta = getDelta(tx);
-            if (delta.lt(zero)) {
+            if (delta < 0n) {
                 throw Error(errorNonPositiveBalance);
             }
-            if (delta.eq(zero)) {
+            if (delta == 0n) {
                 continue;
             }
             lastNonZeroName = name;
-            mutableAssets[name].balance = balance.add(delta);
-            mutableAssets[name].availableBalance = availableBalance.add(delta);
+            mutableAssets[name].balance += delta;
+            mutableAssets[name].availableBalance += delta;
         }
         if (lastNonZeroName !== "") {
             mutableAssets[lastNonZeroName].addFunds.push(addFund);

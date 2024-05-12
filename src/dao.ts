@@ -1,20 +1,14 @@
 import type { Cell, Hexadecimal, PackedDao, PackedSince } from "@ckb-lumos/base";
-import { BI, type BIish } from "@ckb-lumos/bi";
 import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { defaultScript } from "./config.js";
 import { hexify } from "@ckb-lumos/codec/lib/bytes.js";
-import { Uint64 } from "@ckb-lumos/codec/lib/number/uint.js";
-import {
-    type EpochSinceValue, generateHeaderEpoch, parseAbsoluteEpochSince, parseEpoch
-} from "@ckb-lumos/base/lib/since.js";
-import {
-    calculateDaoEarliestSinceCompatible, calculateMaximumWithdrawCompatible
-} from "@ckb-lumos/common-scripts/lib/dao.js";
+import { generateHeaderEpoch, parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since.js";
+import type { EpochSinceValue } from "@ckb-lumos/base/lib/since.js";
+import { calculateDaoEarliestSinceCompatible, calculateMaximumWithdraw } from "@ckb-lumos/common-scripts/lib/dao.js";
 import { I8Cell, I8Script, I8Header, headerDeps, since, witness } from "./cell.js";
 import { addCells, addHeaderDeps, calculateFee, txSize } from "./transaction.js";
-import { epochSinceAdd, epochSinceCompare, scriptEq } from "./utils.js";
-
-const zero = BI.from(0);
+import { epochSinceAdd, epochSinceCompare, hex, scriptEq } from "./utils.js";
+import { Uint64 } from "./codec.js";
 
 export const errorUndefinedBlockNumber = "Encountered an input cell with blockNumber undefined";
 export function daoSifter(
@@ -62,7 +56,7 @@ export function daoSifter(
         if (c.data === DEPOSIT_DATA) {
             deposits.push(extendCell(c, lock, h));
         } else {
-            const h1 = getHeader(Uint64.unpack(c.data).toHexString(), c);
+            const h1 = getHeader(hex(Uint64.unpack(c.data)), c);
             const since = calculateDaoEarliestSinceCompatible(h1.epoch, h.epoch).toHexString();
             withdrawalRequests.push(extendCell(c, lock, h, h1, since));
         }
@@ -87,7 +81,7 @@ export function isDaoWithdrawalRequest(c: Cell) {
 
 export function daoDeposit(
     tx: TransactionSkeletonType,
-    capacities: readonly BI[],
+    capacities: readonly bigint[],
     accountLock: I8Script
 ) {
     const baseDeposit = I8Cell.from({
@@ -96,7 +90,7 @@ export function daoDeposit(
         data: DEPOSIT_DATA,
     });
 
-    const deposits = capacities.map(c => I8Cell.from({ ...baseDeposit, capacity: c.toHexString() }));
+    const deposits = capacities.map(c => I8Cell.from({ ...baseDeposit, capacity: hex(c) }));
 
     return addCells(tx, "append", [], deposits);
 }
@@ -116,7 +110,7 @@ export function daoRequestWithdrawalFrom(
 
         withdrawalRequests.push(I8Cell.from({
             cellOutput: d.cellOutput,
-            data: hexify(Uint64.pack(BI.from(d.blockNumber!))),
+            data: hexify(Uint64.pack(BigInt(d.blockNumber!))),
         }));
     }
 
@@ -151,13 +145,13 @@ export function daoRequestWithdrawalWith(
     deposits: readonly I8Cell[],
     accountLock: I8Script,
     tipHeader: I8Header,
-    maxWithdrawalAmount: BI,
+    maxWithdrawalAmount: bigint,
     maxWithdrawalCells: number = Number.POSITIVE_INFINITY,
     minLocking?: EpochSinceValue,
     additionalMaxLocking?: EpochSinceValue
 ) {
     let extendedDeposits = deposits
-        .filter(d => maxWithdrawalAmount.gte(d.cellOutput.capacity))
+        .filter(d => maxWithdrawalAmount >= BigInt(d.cellOutput.capacity))
         .map(d => Object.freeze({
             deposit: d,
             withdrawalAmount: withdrawalAmountEstimation(d, tipHeader.dao),
@@ -168,7 +162,7 @@ export function daoRequestWithdrawalWith(
         //Let's fast forward the tip header of minLockingPeriod to avoid withdrawals having to wait 180 more epochs
         const withdrawalRequestEpoch = epochSinceAdd(parseEpoch(tipHeader.epoch), minLocking);
         extendedDeposits = extendedDeposits
-            .filter(({ withdrawalAmount }) => maxWithdrawalAmount.gte(withdrawalAmount))
+            .filter(({ withdrawalAmount }) => maxWithdrawalAmount >= withdrawalAmount)
             .map(({ deposit, withdrawalAmount }) => Object.freeze({
                 deposit,
                 withdrawalAmount,
@@ -184,11 +178,11 @@ export function daoRequestWithdrawalWith(
     }
 
     //This does NOT attempt to solve the Knapsack problem, it just withdraw the earliest deposits under budget
-    let currentWithdrawalAmount = zero;
+    let currentWithdrawalAmount = 0n;
     const optimalDeposits: I8Cell[] = []
     for (const { deposit, withdrawalAmount } of extendedDeposits) {
-        const newWithdrawalAmount = currentWithdrawalAmount.add(withdrawalAmount);
-        if (newWithdrawalAmount.gt(maxWithdrawalAmount)) {
+        const newWithdrawalAmount = currentWithdrawalAmount + withdrawalAmount;
+        if (newWithdrawalAmount > maxWithdrawalAmount) {
             continue;
         }
         currentWithdrawalAmount = newWithdrawalAmount;
@@ -215,28 +209,28 @@ export function withdrawalEpochEstimation(deposit: I8Cell, withdrawalRequestEpoc
 
 export function withdrawalAmountEstimation(deposit: I8Cell, withdrawalRequestDao: PackedDao) {
     const depositDao = deposit.cellOutput.type![headerDeps][0]!.dao;
-    return calculateMaximumWithdrawCompatible(deposit, depositDao, withdrawalRequestDao);
+    return calculateMaximumWithdraw(deposit, depositDao, withdrawalRequestDao);
 }
 
-export function ckbDelta(tx: TransactionSkeletonType, feeRate: BIish) {
-    let ckbDelta = zero;
+export function ckbDelta(tx: TransactionSkeletonType, feeRate: bigint) {
+    let ckbDelta = 0n;
     for (const c of tx.inputs) {
         //Second Withdrawal step from NervosDAO
         if (isDaoWithdrawalRequest(c)) {
             const withdrawalRequest = c as I8Cell;
             const [withdrawalHeader, depositHeader] = withdrawalRequest.cellOutput.type![headerDeps];
-            const maxWithdrawable = calculateMaximumWithdrawCompatible(c, depositHeader.dao, withdrawalHeader.dao);
-            ckbDelta = ckbDelta.add(maxWithdrawable);
+            const maxWithdrawable = calculateMaximumWithdraw(c, depositHeader.dao, withdrawalHeader.dao);
+            ckbDelta += maxWithdrawable;
         } else {
-            ckbDelta = ckbDelta.add(c.cellOutput.capacity);
+            ckbDelta += BigInt(c.cellOutput.capacity);
         }
     }
 
-    tx.outputs.forEach((c) => ckbDelta = ckbDelta.sub(c.cellOutput.capacity));
+    tx.outputs.forEach((c) => ckbDelta -= BigInt(c.cellOutput.capacity));
 
     //Don't account for the tx fee if there are no outputs
-    if (tx.outputs.size > 0 && BI.from(feeRate).gt(zero)) {
-        ckbDelta = ckbDelta.sub(calculateFee(txSize(tx), feeRate));
+    if (tx.outputs.size > 0 && feeRate > 0n) {
+        ckbDelta -= calculateFee(txSize(tx), feeRate);
     }
 
     return ckbDelta;

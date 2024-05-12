@@ -1,5 +1,4 @@
 import type { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/base";
-import { BI, type BIish } from "@ckb-lumos/bi";
 import { createTransactionFromSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { Map as ImmutableMap, List, Record } from "immutable";
 import { cellDeps, headerDeps, I8Cell, i8ScriptPadding, since, witness } from "./cell.js";
@@ -267,12 +266,12 @@ export function txSize(tx: TransactionSkeletonType) {
     return serializedTx.byteLength + 4;
 }
 
-export function calculateFee(size: number, feeRate: BIish): BI {
-    const ratio = BI.from(1000);
-    const base = BI.from(size).mul(feeRate);
-    const fee = base.div(ratio);
-    if (fee.mul(ratio).lt(base)) {
-        return fee.add(1);
+export function calculateFee(size: number, feeRate: bigint) {
+    const ratio = 1000n;
+    const base = BigInt(size) * feeRate;
+    const fee = base / ratio;
+    if (fee * ratio < base) {
+        return fee + 1n;
     }
     return fee;
 }

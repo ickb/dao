@@ -1,5 +1,4 @@
 import type { Cell, Hexadecimal, OutPoint, Header, Transaction, Hash } from "@ckb-lumos/base";
-import { BI } from "@ckb-lumos/bi";
 import { defaultRpcUrl, getChainInfo } from "./config.js";
 import { I8Header } from "./cell.js";
 import { LightClientRPC } from "@ckb-lumos/light-client";
@@ -107,7 +106,7 @@ export async function getFeeRate() {
     const chainInfo = getChainInfo();
 
     if (chainInfo.chain === "devnet") {
-        return BI.from(1000);
+        return 1000n;
     }
 
     const rpc = new RPC(chainInfo.isLightClientRpc ? defaultRpcUrl(chainInfo.chain) : chainInfo.rpcUrl);
@@ -117,13 +116,13 @@ export async function getFeeRate() {
         rpc.getFeeRateStatistics("0x101")
     ]);
 
-    const median101 = feeRateStatistics101 ? BI.from(feeRateStatistics101.median) : BI.from(1000);
-    const median6 = feeRateStatistics6 ? BI.from(feeRateStatistics6.median) : median101;
+    const median101 = feeRateStatistics101 ? BigInt(feeRateStatistics101.median) : 1000n;
+    const median6 = feeRateStatistics6 ? BigInt(feeRateStatistics6.median) : median101;
 
-    let res = median6.gt(median101) ? median6 : median101;
+    let res = median6 > median101 ? median6 : median101;
 
     //Increase by 10%
-    res = res.add(res.div(10));
+    res += res / 10n;
 
     return res;
 }

@@ -1,7 +1,6 @@
 import create from "keccak";
 import { bytes } from "@ckb-lumos/codec";
 import { blockchain } from "@ckb-lumos/base";
-import type { Cell } from "@ckb-lumos/base";
 import { createTransactionFromSkeleton, encodeToAddress } from "@ckb-lumos/helpers";
 import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { createP2PKHMessageGroup } from "@ckb-lumos/common-scripts";
