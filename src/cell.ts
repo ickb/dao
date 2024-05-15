@@ -97,7 +97,7 @@ export class I8Cell implements I8Cellable {
         this.blockHash = i.blockHash;
         this.blockNumber = i.blockNumber;
         this.txIndex = i.txIndex;
-        if (BigInt(capacity) < 0n) {
+        if (BigInt(capacity) <= 0n) {
             capacity = minimalCellCapacityCompatible(this, { validate: false }).toHexString();
             this.cellOutput = I8CellOutput.from({ capacity, lock, type });
         }

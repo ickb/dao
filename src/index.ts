@@ -1,4 +1,5 @@
 export * from './cell.js';
+export * from './ckb_asset.js';
 export * from './codec.js';
 export * from './config.js';
 export * from './dao.js';

@@ -1,27 +1,18 @@
-import { parseAbsoluteEpochSince, parseEpoch } from "@ckb-lumos/base/lib/since.js";
-import { I8Cell, I8Header, I8Script, since } from "./cell.js";
 import { TransactionSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
-import { ckbDelta, daoWithdrawFrom, isDao } from "./dao.js";
+import { isDao } from "./dao.js";
+import type { I8Cell } from "./cell.js";
+import { logSplit } from "./utils.js";
 import { addCells } from "./transaction.js";
-import { epochSinceCompare, hex, logSplit } from "./utils.js";
 
 export const errorNoFundingMethods = "No funding method specified";
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
 export const errorIncorrectChange = "Some assets are not balanced correctly between input and output";
 export const errorTooManyOutputs = "A transaction using Nervos DAO script is currently limited to 64 output cells"
-export const errorUnknownAsset = "Unknown asset name found in minChanges"
 export function fund(
     tx: TransactionSkeletonType,
     assets: Assets,
-    useAll: boolean = false,
-    minChanges: Readonly<{ [name: string]: bigint }> = {}
+    useAll: boolean = false
 ) {
-    for (const name of Object.keys(minChanges)) {
-        if (!assets[name]) {
-            throw Error(errorUnknownAsset);
-        }
-    }
-
     const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
     const addChanges: ((tx: TransactionSkeletonType) => TransactionSkeletonType | undefined)[] = [];
 
@@ -31,8 +22,7 @@ export function fund(
         //Assets is iterated in the reverse order, so that CKB is last to be funded
         for (const [name, { getDelta, addChange: ac, addFunds: af }] of [...Object.entries(assets)].reverse()) {
             txWithChange = undefined;
-            const minChange = minChanges[name] ?? 0n;
-            addChanges.push((tx: TransactionSkeletonType) => ac(tx, minChange));
+            addChanges.push(...[...Object.values(ac)].reverse());
             addFunds.push(...af);
             addFunds.push((tx: TransactionSkeletonType) => tx);
             let balanceEstimation = getDelta(txWithChange ?? tx);
@@ -42,7 +32,7 @@ export function fund(
 
                 //Try a quick estimation of how many funds it would take to even out input and output balances
                 balanceEstimation += getDelta(addFund(TransactionSkeleton()));
-                if (balanceEstimation < minChange) {
+                if (balanceEstimation < 0n) {
                     continue;
                 }
 
@@ -70,12 +60,15 @@ export function fund(
                 tx = addFund(tx);
             }
         }
+
         //Use the slow but 100% accurate method to check that enough funds has been added to input
         //Assets is iterated in the reverse order, so that CKB is last to be funded
-        for (const [name, { addChange }] of [...Object.entries(assets)].reverse()) {
-            txWithChange = addChange(txWithChange ?? tx, minChanges[name] ?? 0n);
-            if (!txWithChange) {
-                throw new NotEnoughFundsError(name);
+        for (const [name, { addChange: aacc }] of [...Object.entries(assets)].reverse()) {
+            for (const ac of [...Object.values(aacc)].reverse()) {
+                txWithChange = ac(txWithChange ?? tx);
+                if (!txWithChange) {
+                    throw new NotEnoughFundsError(name);
+                }
             }
         }
     }
@@ -112,102 +105,46 @@ export class NotEnoughFundsError extends Error {
     }
 }
 
-export function ckbFundAdapter(
-    accountLock: I8Script,
-    feeRate: bigint,
-    addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
-    capacities: readonly I8Cell[],
-    tipHeader?: I8Header,
-    withdrawalRequests?: readonly I8Cell[],
-) {
-    const getDelta = (tx: TransactionSkeletonType) => ckbDelta(tx, feeRate);
-
-    const addChange = (tx: TransactionSkeletonType, minChange: bigint) => {
-        if (tx.equals(TransactionSkeleton())) {
-            return tx;
-        }
-
-        let changeCell = I8Cell.from({ lock: accountLock });
-        const txWithPlaceholders = addPlaceholders(addCells(tx, "append", [], [changeCell]));
-        const delta = getDelta(txWithPlaceholders);
-        const capacity = delta + BigInt(changeCell.cellOutput.capacity);
-        if (delta < 0n || capacity < minChange) {
-            return undefined;
-        }
-
-        changeCell = I8Cell.from({
-            ...changeCell,
-            capacity: hex(capacity)
-        });
-        return addPlaceholders(addCells(tx, "append", [], [changeCell]));
-    }
-
-    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
-    for (const cc of logSplit(capacities)) {
-        addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", cc, []));
-    }
-
-    const unavailableWithdrawalRequests: I8Cell[] = [];
-    if (tipHeader && withdrawalRequests) {
-        const tipEpoch = parseEpoch(tipHeader.epoch);
-        const availableWithdrawalRequests: I8Cell[] = [];
-        for (const wr of withdrawalRequests) {
-            const withdrawalEpoch = parseAbsoluteEpochSince(wr.cellOutput.type![since]);
-            if (epochSinceCompare(tipEpoch, withdrawalEpoch) === -1) {
-                unavailableWithdrawalRequests.push(wr);
-                continue;
-            }
-            availableWithdrawalRequests.push(wr);
-        }
-        for (const wwrr of logSplit(availableWithdrawalRequests)) {
-            addFunds.push((tx: TransactionSkeletonType) => daoWithdrawFrom(tx, wwrr));
-        }
-    }
-
-    const unavailableFunds = [TransactionSkeleton().update("inputs", i => i.push(...unavailableWithdrawalRequests))];
-
-    return addAsset({}, "CKB", getDelta, addChange, addFunds, unavailableFunds);
-}
 
 export type Assets = Readonly<{
     [name: string]: Readonly<{// All caps names like CKB, ICKB_UDT ...
-        getDelta: (tx: TransactionSkeletonType) => bigint
-        addChange: (tx: TransactionSkeletonType, minChange: bigint) => TransactionSkeletonType | undefined
+        getDelta: (tx: TransactionSkeletonType) => bigint,
+        addChange: Readonly<{ [name: string]: (tx: TransactionSkeletonType) => TransactionSkeletonType | undefined }>,
         addFunds: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
-        availableBalance: bigint,
-        balance: bigint,
+        estimatedAvailable: bigint,
+        estimated: bigint,
     }>
 }>;
 
-export const errorDuplicatedAsset = "Asset already exists";
+export const errorDefaultAddChangeNotFound = "Default add change not found in first position";
 export function addAsset(
     assets: Assets,
     name: string,// All caps names like CKB, ICKB_UDT ...
-    getDelta: (tx: TransactionSkeletonType) => bigint,
-    addChange: (tx: TransactionSkeletonType, minChange: bigint) => TransactionSkeletonType | undefined,
-    addFunds?: readonly ((tx: TransactionSkeletonType) => TransactionSkeletonType)[],
-    unavailableFunds?: readonly TransactionSkeletonType[]
+    getDelta: ((tx: TransactionSkeletonType) => bigint),
+    addChange: Readonly<{ [name: string]: (tx: TransactionSkeletonType) => TransactionSkeletonType | undefined }>,
 ): Assets {
-    if (assets[name]) {
-        throw Error(errorDuplicatedAsset);
+    const old = assets[name] ?? {};
+    const oldAddChange = old.addChange ?? {};
+    addChange = Object.freeze({ ...oldAddChange, ...addChange });
+
+    //Check that default is correctly populated
+    for (const k in addChange) {
+        if (k !== "DEFAULT") {
+            throw Error(errorDefaultAddChangeNotFound);
+        }
+        break;
     }
 
-    assets = Object.freeze({
+    return Object.freeze({
         ...assets,
         [name]: Object.freeze({
             getDelta,
             addChange,
-            addFunds: Object.freeze([]),
-            availableBalance: 0n,
-            balance: 0n,
+            addFunds: old.addFunds ?? Object.freeze([]),
+            estimatedAvailable: old.estimatedAvailable ?? 0n,
+            estimated: old.estimated ?? 0n,
         })
     });
-
-    if (addFunds || unavailableFunds) {
-        assets = addAssetsFunds(assets, addFunds, unavailableFunds);
-    }
-
-    return assets;
 }
 
 export const errorNonPositiveBalance = "Fund add zero or negative balance";
@@ -217,11 +154,11 @@ export function addAssetsFunds(
     unavailableFunds?: readonly TransactionSkeletonType[]
 ): Assets {
     const mutableAssets = Object.fromEntries(Object.entries(assets)
-        .map(([name, { getDelta, addChange, addFunds, availableBalance, balance }]) =>
-            [name, { getDelta, addChange, addFunds: [...addFunds], availableBalance, balance }]));
+        .map(([name, { getDelta, addChange, addFunds, estimatedAvailable, estimated }]) =>
+            [name, { getDelta, addChange, addFunds: [...addFunds], estimatedAvailable, estimated }]));
 
     for (const tx of unavailableFunds ?? []) {
-        for (const [name, { getDelta, balance }] of Object.entries(mutableAssets)) {
+        for (const [name, { getDelta }] of Object.entries(mutableAssets)) {
             const delta = getDelta(tx);
             if (delta < 0n) {
                 throw Error(errorNonPositiveBalance);
@@ -229,14 +166,14 @@ export function addAssetsFunds(
             if (delta == 0n) {
                 continue;
             }
-            mutableAssets[name].balance += delta;
+            mutableAssets[name].estimated += delta;
         }
     }
 
     for (const addFund of addFunds ?? []) {
         const tx = addFund(TransactionSkeleton());
         let lastNonZeroName = "";
-        for (const [name, { getDelta, availableBalance, balance }] of Object.entries(mutableAssets)) {
+        for (const [name, { getDelta }] of Object.entries(mutableAssets)) {
             const delta = getDelta(tx);
             if (delta < 0n) {
                 throw Error(errorNonPositiveBalance);
@@ -245,8 +182,8 @@ export function addAssetsFunds(
                 continue;
             }
             lastNonZeroName = name;
-            mutableAssets[name].balance += delta;
-            mutableAssets[name].availableBalance += delta;
+            mutableAssets[name].estimated += delta;
+            mutableAssets[name].estimatedAvailable += delta;
         }
         if (lastNonZeroName !== "") {
             mutableAssets[lastNonZeroName].addFunds.push(addFund);
@@ -256,12 +193,22 @@ export function addAssetsFunds(
     }
 
     return Object.freeze(Object.fromEntries(Object.entries(mutableAssets)
-        .map(([name, { balance, availableBalance, addFunds, addChange, getDelta }]) =>
+        .map(([name, { estimated, estimatedAvailable, addFunds, addChange, getDelta }]) =>
             [name, Object.freeze({
                 getDelta,
                 addChange,
                 addFunds: Object.freeze(addFunds),
-                availableBalance,
-                balance
+                estimatedAvailable,
+                estimated
             })])));
+}
+
+export function addSimpleCells(assets: Assets, cells: readonly I8Cell[]) {
+    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
+
+    for (const cc of logSplit(cells)) {
+        addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", cc, []));
+    }
+
+    return addAssetsFunds(assets, addFunds);
 }

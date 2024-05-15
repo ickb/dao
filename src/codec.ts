@@ -5,14 +5,6 @@ import {
 
 // This codec file exists for the sole purpose to move away from BI. The web standard is now bigint.
 
-export const Boolean = createFixedBytesCodec<boolean>(
-    {
-        byteLength: 1,
-        pack: (packable) => new Uint8Array([packable ? 1 : 0]),
-        unpack: (unpackable) => unpackable.at(0)! === 0 ? false : true,
-    },
-);
-
 export const Uint8 = createFixedBytesCodec<number, number | string | bigint>(U8);
 export const Uint16 = createFixedBytesCodec<number, number | string | bigint>(U16);
 export const Uint32 = createFixedBytesCodec<number, number | string | bigint>(U32);
