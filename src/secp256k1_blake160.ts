@@ -1,4 +1,5 @@
-import { type TransactionSkeletonType, sealTransaction } from "@ckb-lumos/helpers";
+import { sealTransaction } from "@ckb-lumos/helpers";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { I8Script, witness } from "./cell.js";
 import { encodeToAddress } from "@ckb-lumos/helpers";
 import { key } from "@ckb-lumos/hd";

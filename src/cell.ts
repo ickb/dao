@@ -1,6 +1,5 @@
 import type {
-    Hash, Header, HexNumber, HexString, Script, OutPoint,
-    PackedSince, Cell, DepType, CellDep, HashType
+    Hash, Header, HexNumber, HexString, Script, OutPoint, PackedSince, Cell, DepType, CellDep, HashType
 } from "@ckb-lumos/base";
 import { minimalCellCapacityCompatible } from "@ckb-lumos/helpers";
 import type { CellOutput } from "@ckb-lumos/ckb-indexer/lib/indexerType.js";

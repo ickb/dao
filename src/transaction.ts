@@ -1,5 +1,6 @@
 import type { CellDep, Header, Hexadecimal, PackedSince, Script } from "@ckb-lumos/base";
-import { createTransactionFromSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { createTransactionFromSkeleton } from "@ckb-lumos/helpers";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { Map as ImmutableMap, List, Record } from "immutable";
 import { cellDeps, headerDeps, I8Cell, i8ScriptPadding, since, witness } from "./cell.js";
 import { bytes } from "@ckb-lumos/codec";
@@ -96,9 +97,9 @@ function addWitnessesFrom(
     let witnesses: string[] = [];
     for (let i = 0; i < witnessesLength; i++) {
         witnesses.push(bytes.hexify(WitnessArgs.pack({
-            lock: lockWs.at(i),
-            inputType: inputTypeWs.at(i),
-            outputType: outputTypeWs.at(i),
+            lock: lockWs[i],
+            inputType: inputTypeWs[i],
+            outputType: outputTypeWs[i],
         })));
     }
 

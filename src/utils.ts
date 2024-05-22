@@ -2,8 +2,13 @@ import { defaultScript } from "./config.js";
 import { I8Cell, I8Script } from "./cell.js";
 import type { Cell, Script } from "@ckb-lumos/base";
 import type { EpochSinceValue } from "@ckb-lumos/base/lib/since.js";
+import { addAssetsFunds } from "./fund.js";
+import type { Assets } from "./fund.js";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { addCells } from "./transaction.js";
 
-export const ckbInShannons = 100000000n;
+//CKB is one ckb expressed in shannons
+export const CKB = 100000000n;
 
 export function hex(n: number | BigInt) {
     return "0x" + n.toString(16);
@@ -90,6 +95,18 @@ export function simpleSifter(
         types,
         notSimples: notTypes
     };
+}
+
+export function addSimpleCells(assets: Assets, ...cells: readonly I8Cell[][]) {
+    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
+
+    for (const ccc of cells) {
+        for (const cc of logSplit(ccc)) {
+            addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", cc, []));
+        }
+    }
+
+    return addAssetsFunds(assets, addFunds);
 }
 
 export const errorBothScriptUndefined = "Comparing two Scripts that both are undefined";

@@ -1,8 +1,6 @@
-import { TransactionSkeleton, type TransactionSkeletonType } from "@ckb-lumos/helpers";
+import { TransactionSkeleton } from "@ckb-lumos/helpers";
+import type { TransactionSkeletonType } from "@ckb-lumos/helpers";
 import { isDao } from "./dao.js";
-import type { I8Cell } from "./cell.js";
-import { logSplit } from "./utils.js";
-import { addCells } from "./transaction.js";
 
 export const errorNoFundingMethods = "No funding method specified";
 export const errorNotEnoughFunds = "Not enough funds to execute the transaction";
@@ -201,14 +199,4 @@ export function addAssetsFunds(
                 estimatedAvailable,
                 estimated
             })])));
-}
-
-export function addSimpleCells(assets: Assets, cells: readonly I8Cell[]) {
-    const addFunds: ((tx: TransactionSkeletonType) => TransactionSkeletonType)[] = [];
-
-    for (const cc of logSplit(cells)) {
-        addFunds.push((tx: TransactionSkeletonType) => addCells(tx, "append", cc, []));
-    }
-
-    return addAssetsFunds(assets, addFunds);
 }

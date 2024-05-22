@@ -9,90 +9,84 @@ importers:
   .:
     dependencies:
       '@ckb-lumos/base':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/ckb-indexer':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/codec':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/common-scripts':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/config-manager':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/hd':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/helpers':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/light-client':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       '@ckb-lumos/rpc':
-        specifier: ^0.22.2
-        version: 0.22.2
+        specifier: ^0.23.0-next.0
+        version: 0.23.0-next.0
       immutable:
         specifier: ^4.3.0
         version: 4.3.5
-      keccak:
-        specifier: ^3.0.4
-        version: 3.0.4
     devDependencies:
-      '@types/keccak':
-        specifier: ^3.0.4
-        version: 3.0.4
       typescript:
         specifier: ^5.4.5
         version: 5.4.5
 
 packages:
 
-  '@ckb-lumos/base@0.22.2':
-    resolution: {integrity: sha512-nosUCSa5rTV2IzxbEpqzrvUeQNXB66mgA0h40+QEdnE/gV/s4ke83AScrTAxWkErJy1G/sToIHCc2kWwO95DfQ==}
+  '@ckb-lumos/base@0.23.0-next.0':
+    resolution: {integrity: sha512-lCR1R1ucVjzIL9bW1vTmwQ4R0K45BPGLDNVy7cDu5BX7XihHrrHKI40zqCXA0/tRUURVhguuf4u3qyZC6FdwQw==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/bi@0.22.2':
-    resolution: {integrity: sha512-F+dLC/tE+xdtNuGgJxlDqbgX/f8azg1tvIFTR5mu7Vhz08nkFgnA+Z+yC0t/I3fDwwH4p/SlGP/yducrsfVTqw==}
+  '@ckb-lumos/bi@0.23.0-next.0':
+    resolution: {integrity: sha512-YDvrLbBUoVc5Ddk5RerhzaOWTOSBs6bNwKy/GOittOX3mxD30hGG9XXakb+50pKV4D7Nyc+OpBC93OF10gJnTw==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/ckb-indexer@0.22.2':
-    resolution: {integrity: sha512-y4v2yNa3IYURcUc+lkFs/4/nV4W0QQeCORtv1IlkgbES0718XB4IMGWvQtSGKAC94A9B4kSHREcyn0d+9lMzew==}
+  '@ckb-lumos/ckb-indexer@0.23.0-next.0':
+    resolution: {integrity: sha512-oZ810P5zDzw19nAPB3NkuW5UKoMSBkeKnNn42buqc8g+T5vMHD4Ikogvl12B/RCLBG18QPi9VEsk8Jd6dQXzwA==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/codec@0.22.2':
-    resolution: {integrity: sha512-P5SyhT2qkJwCwcHF3yMLInE0z3wWHDkqJNbSM2Q9oyu0+9kjMQfexNia3T+atBl2M7ELFzN5WvttojYr6DrCwQ==}
+  '@ckb-lumos/codec@0.23.0-next.0':
+    resolution: {integrity: sha512-QIy8acdXvVzwRD4MiHmaHtiHTVqgDqY1LnioBdxbXZZXaG/vSRLJ0nH+Ig6bMxVoRzk3ufXVpxalbbFNEvN8kg==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/common-scripts@0.22.2':
-    resolution: {integrity: sha512-eSXutpQXqAVh0MorCG8bg+xcMqxhpiJCXgdgfpQAA0q6BkdSGmu4Zn3InFRdeHZam8ap02dadVK7ZOi4ZaUKCg==}
+  '@ckb-lumos/common-scripts@0.23.0-next.0':
+    resolution: {integrity: sha512-D6UeizbEvHGcSCvwVxsvgpRHvRF1bxvI8jmXqkK9FrPxZPSTegLgqblbkuAqnZrJRzYk9xbWwEijxdWtGtPDIA==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/config-manager@0.22.2':
-    resolution: {integrity: sha512-LJ4p80VrCHh178Ks4wW1rEyHC/JWtZxrFiwHinA9aG6aOm2Z9hbZO0/ZKoS5pLfW0gxP2+ZHA3oMVt0UJhlTKA==}
+  '@ckb-lumos/config-manager@0.23.0-next.0':
+    resolution: {integrity: sha512-fUWwpxeUSpzYTfTwR4mRZrG2WmzX4VFCXBw/pxmIkzz+8IBN5h97meoRDo3ruypHP41r7WLgelD62Cf7BhpiEg==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/hd@0.22.2':
-    resolution: {integrity: sha512-bCcW+yoeBNniKijEIjZZZC2/a9ZEhvVco4L+aOHqwRon3jgXLN6izvzBgzm/m9hWUx47PpzPXjq3fRIn+kONxg==}
+  '@ckb-lumos/hd@0.23.0-next.0':
+    resolution: {integrity: sha512-yj8Q84tbQ6Xw1dmfx66kWbXp9UDunCMwmG0NqMIn1eRoNnV4gnGjGSKEDhh4ef+IyN7HxK1NFfedg5Yz3Mb5Kw==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/helpers@0.22.2':
-    resolution: {integrity: sha512-6ztXwxsaCuoHjkbclAnfAv9BYl02t+/XxNtl3Et4Sl09xIp9HJ9/vyJouC9JjdQdnfkv1zVGN9tLiKwc6QudaQ==}
+  '@ckb-lumos/helpers@0.23.0-next.0':
+    resolution: {integrity: sha512-GGuad2mEyb7DZCqWxpkY7qyYHJBDalbLG1V2ngHzdfBL9OmI2MYNUvrHuz7DLYkz1O9i120yWNEGrkwoutSjBQ==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/light-client@0.22.2':
-    resolution: {integrity: sha512-G9cDOeTC81+cVdGnVOEJ767jPDFV+ao/hsc8ANNVCxsWTlj1EQvEzxGB3vi3S9Jh0lri3t3XxRQia8No5HJ4EQ==}
+  '@ckb-lumos/light-client@0.23.0-next.0':
+    resolution: {integrity: sha512-+l1R1Lku8zCzcaGqOV1Q/Q7O/7d4+rDSt1eEQJmJ7WrEJGmiI4I7nTscakKbmeCz/ixJh8TMRso16w/a2x1ZEw==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/rpc@0.22.2':
-    resolution: {integrity: sha512-c2SX0ooDJO3dV2JOTTQtKZs0k+dHst+NHfbYJ6mYWApcZWx2nG4bQR3CQFMIKnd5CKYP/r2JuaonDkcRH9vmzw==}
+  '@ckb-lumos/rpc@0.23.0-next.0':
+    resolution: {integrity: sha512-c+vxestyw+JBc87BhbXMP8sGAEjbDvDclQHTYcCIDjRHUNeCeMQTyT7E8MTQLLdTzeTdAhkRUlFvO0W1Zqwtvw==}
     engines: {node: '>=12.0.0'}
 
-  '@ckb-lumos/toolkit@0.22.2':
-    resolution: {integrity: sha512-HmKz2dGQeaW2XDqkvjJfLv50VQWGKbthg2RDfIxGsZyjveluRROTyuHP1akypy4pqF8TApGLsXci2MaHCRau+w==}
+  '@ckb-lumos/toolkit@0.23.0-next.0':
+    resolution: {integrity: sha512-meJUq/5uKsKcovb9w9vmNkrYEOxYJx5Pbp0Gz0riexYsKai5CYhag8ODvW8aQfmZxA1aH1JqGoaljTLAwDPkPA==}
     engines: {node: '>=12.0.0'}
 
   '@types/blake2b@2.1.3':
@@ -101,17 +95,11 @@ packages:
   '@types/deep-freeze-strict@1.1.2':
     resolution: {integrity: sha512-VvMETBojHvhX4f+ocYTySQlXMZfxKV3Jyb7iCWlWaC+exbedkv6Iv2bZZqI736qXjVguH6IH7bzwMBMfTT+zuQ==}
 
-  '@types/keccak@3.0.4':
-    resolution: {integrity: sha512-hdnkmbie7tE0yXnQQvlIOqCyjEsoXDVEZ3ACqO+F305XgUOW4Z9ElWdogCXXRAW/khnZ7GxM0t/BGB5bORKt/g==}
-
   '@types/lodash.isequal@4.5.8':
     resolution: {integrity: sha512-uput6pg4E/tj2LGxCZo9+y27JNyB2OZuuI/T5F+ylVDYuqICLG2/ktjxx0v6GvVntAf8TvEzeQLcV0ffRirXuA==}
 
   '@types/lodash@4.17.1':
     resolution: {integrity: sha512-X+2qazGS3jxLAIz5JDXDzglAF3KpijdhFxlf/V1+hEsOUc+HnWi81L/uv/EvGuV90WY+7mPGFCUDGfQC3Gj95Q==}
-
-  '@types/node@20.12.11':
-    resolution: {integrity: sha512-vDg9PZ/zi+Nqp6boSOT7plNuthRugEKixDv5sFTIpkE89MmNtEArAShI4mxuX2+UrLEe9pxC1vm2cjm9YlWbJw==}
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -189,10 +177,6 @@ packages:
   jsbi@4.3.0:
     resolution: {integrity: sha512-SnZNcinB4RIcnEyZqFPdGPVgrg2AcnykiBy0sHVJQKHYeaLUvi3Exj+iaPpLnFVkDPZIV4U0yvgC9/R4uEAZ9g==}
 
-  keccak@3.0.4:
-    resolution: {integrity: sha512-3vKuW0jV8J3XNTzvfyicFR5qvxrSAGl7KIhvgOu5cmWwM7tZRj3fMbj/pfIf4be7aznbc+prBWGjywox/g2Y6Q==}
-    engines: {node: '>=10.0.0'}
-
   lodash.isequal@4.5.0:
     resolution: {integrity: sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==}
 
@@ -205,9 +189,6 @@ packages:
   nanoassert@2.0.0:
     resolution: {integrity: sha512-7vO7n28+aYO4J+8w96AzhmU8G+Y/xpPDJz/se19ICsqj/momRbb9mh9ZUtkoJ5X3nTnPdhEJyc0qnM6yAsHBaA==}
 
-  node-addon-api@2.0.2:
-    resolution: {integrity: sha512-Ntyt4AIXyaLIuMHF6IOoTakB3K+RWxwtsHNRxllEoA6vPwP9o4866g6YWDLUdnucilZhmkxiHwHr11gAENw+QA==}
-
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
     engines: {node: 4.x || >=6.0.0}
@@ -217,25 +198,11 @@ packages:
       encoding:
         optional: true
 
-  node-gyp-build@4.8.1:
-    resolution: {integrity: sha512-OSs33Z9yWr148JZcbZd5WiAXhh/n9z8TxQcdMhIOlpN9AhWpLfvVFO73+m77bBABQMaY9XSvIa+qk0jlI7Gcaw==}
-    hasBin: true
-
-  readable-stream@3.6.2:
-    resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
-    engines: {node: '>= 6'}
-
-  safe-buffer@5.2.1:
-    resolution: {integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==}
-
   scrypt-js@3.0.1:
     resolution: {integrity: sha512-cdwTTnqPu0Hyvf5in5asVdZocVDTNRmR7XEcJuIzMjJeSHybHl7vpB66AzwTaIg6CLSbtjcxc8fqcySfnTkccA==}
 
   sha3@2.1.4:
     resolution: {integrity: sha512-S8cNxbyb0UGUM2VhRD4Poe5N58gJnJsLJ5vC7FYWGUmGhcsj4++WaIOBFVDxlG0W3To6xBuiRh+i0Qp2oNCOtg==}
-
-  string_decoder@1.3.0:
-    resolution: {integrity: sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==}
 
   tr46@0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
@@ -244,12 +211,6 @@ packages:
     resolution: {integrity: sha512-vcI4UpRgg81oIRUFwR0WSIHKt11nJ7SAVlYNIu+QpqeyXP+gpQJy/Z4+F0aGxSE4MqwjyXvW/TzgkLAx2AGHwQ==}
     engines: {node: '>=14.17'}
     hasBin: true
-
-  undici-types@5.26.5:
-    resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
-
-  util-deprecate@1.0.2:
-    resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
@@ -263,125 +224,117 @@ packages:
 
 snapshots:
 
-  '@ckb-lumos/base@0.22.2':
+  '@ckb-lumos/base@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/bi': 0.22.2
-      '@ckb-lumos/codec': 0.22.2
-      '@ckb-lumos/toolkit': 0.22.2
+      '@ckb-lumos/bi': 0.23.0-next.0
+      '@ckb-lumos/codec': 0.23.0-next.0
+      '@ckb-lumos/toolkit': 0.23.0-next.0
       '@types/blake2b': 2.1.3
       '@types/lodash.isequal': 4.5.8
       blake2b: 2.1.4
       js-xxhash: 1.0.4
       lodash.isequal: 4.5.0
 
-  '@ckb-lumos/bi@0.22.2':
+  '@ckb-lumos/bi@0.23.0-next.0':
     dependencies:
       jsbi: 4.3.0
 
-  '@ckb-lumos/ckb-indexer@0.22.2':
+  '@ckb-lumos/ckb-indexer@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/bi': 0.22.2
-      '@ckb-lumos/codec': 0.22.2
-      '@ckb-lumos/rpc': 0.22.2
-      '@ckb-lumos/toolkit': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/bi': 0.23.0-next.0
+      '@ckb-lumos/codec': 0.23.0-next.0
+      '@ckb-lumos/rpc': 0.23.0-next.0
+      '@ckb-lumos/toolkit': 0.23.0-next.0
       cross-fetch: 3.1.8
       events: 3.3.0
     transitivePeerDependencies:
       - encoding
 
-  '@ckb-lumos/codec@0.22.2':
+  '@ckb-lumos/codec@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/bi': 0.22.2
+      '@ckb-lumos/bi': 0.23.0-next.0
 
-  '@ckb-lumos/common-scripts@0.22.2':
+  '@ckb-lumos/common-scripts@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/bi': 0.22.2
-      '@ckb-lumos/codec': 0.22.2
-      '@ckb-lumos/config-manager': 0.22.2
-      '@ckb-lumos/helpers': 0.22.2
-      '@ckb-lumos/rpc': 0.22.2
-      '@ckb-lumos/toolkit': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/bi': 0.23.0-next.0
+      '@ckb-lumos/codec': 0.23.0-next.0
+      '@ckb-lumos/config-manager': 0.23.0-next.0
+      '@ckb-lumos/helpers': 0.23.0-next.0
+      '@ckb-lumos/rpc': 0.23.0-next.0
+      '@ckb-lumos/toolkit': 0.23.0-next.0
       bech32: 2.0.0
       bs58: 5.0.0
       immutable: 4.3.5
     transitivePeerDependencies:
       - encoding
 
-  '@ckb-lumos/config-manager@0.22.2':
+  '@ckb-lumos/config-manager@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/bi': 0.22.2
-      '@ckb-lumos/codec': 0.22.2
-      '@ckb-lumos/rpc': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/bi': 0.23.0-next.0
+      '@ckb-lumos/codec': 0.23.0-next.0
+      '@ckb-lumos/rpc': 0.23.0-next.0
       '@types/deep-freeze-strict': 1.1.2
       deep-freeze-strict: 1.1.1
     transitivePeerDependencies:
       - encoding
 
-  '@ckb-lumos/hd@0.22.2':
+  '@ckb-lumos/hd@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/bi': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/bi': 0.23.0-next.0
       bn.js: 5.2.1
       elliptic: 6.5.5
       scrypt-js: 3.0.1
       sha3: 2.1.4
       uuid: 8.3.2
 
-  '@ckb-lumos/helpers@0.22.2':
+  '@ckb-lumos/helpers@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/bi': 0.22.2
-      '@ckb-lumos/codec': 0.22.2
-      '@ckb-lumos/config-manager': 0.22.2
-      '@ckb-lumos/toolkit': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/bi': 0.23.0-next.0
+      '@ckb-lumos/codec': 0.23.0-next.0
+      '@ckb-lumos/config-manager': 0.23.0-next.0
+      '@ckb-lumos/toolkit': 0.23.0-next.0
       bech32: 2.0.0
       immutable: 4.3.5
     transitivePeerDependencies:
       - encoding
 
-  '@ckb-lumos/light-client@0.22.2':
+  '@ckb-lumos/light-client@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/ckb-indexer': 0.22.2
-      '@ckb-lumos/rpc': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/ckb-indexer': 0.23.0-next.0
+      '@ckb-lumos/rpc': 0.23.0-next.0
       cross-fetch: 3.1.8
       events: 3.3.0
     transitivePeerDependencies:
       - encoding
 
-  '@ckb-lumos/rpc@0.22.2':
+  '@ckb-lumos/rpc@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/base': 0.22.2
-      '@ckb-lumos/bi': 0.22.2
+      '@ckb-lumos/base': 0.23.0-next.0
+      '@ckb-lumos/bi': 0.23.0-next.0
       abort-controller: 3.0.0
       cross-fetch: 3.1.8
     transitivePeerDependencies:
       - encoding
 
-  '@ckb-lumos/toolkit@0.22.2':
+  '@ckb-lumos/toolkit@0.23.0-next.0':
     dependencies:
-      '@ckb-lumos/bi': 0.22.2
+      '@ckb-lumos/bi': 0.23.0-next.0
 
   '@types/blake2b@2.1.3': {}
 
   '@types/deep-freeze-strict@1.1.2': {}
-
-  '@types/keccak@3.0.4':
-    dependencies:
-      '@types/node': 20.12.11
 
   '@types/lodash.isequal@4.5.8':
     dependencies:
       '@types/lodash': 4.17.1
 
   '@types/lodash@4.17.1': {}
-
-  '@types/node@20.12.11':
-    dependencies:
-      undici-types: 5.26.5
 
   abort-controller@3.0.0:
     dependencies:
@@ -463,12 +416,6 @@ snapshots:
 
   jsbi@4.3.0: {}
 
-  keccak@3.0.4:
-    dependencies:
-      node-addon-api: 2.0.2
-      node-gyp-build: 4.8.1
-      readable-stream: 3.6.2
-
   lodash.isequal@4.5.0: {}
 
   minimalistic-assert@1.0.1: {}
@@ -477,21 +424,9 @@ snapshots:
 
   nanoassert@2.0.0: {}
 
-  node-addon-api@2.0.2: {}
-
   node-fetch@2.7.0:
     dependencies:
       whatwg-url: 5.0.0
-
-  node-gyp-build@4.8.1: {}
-
-  readable-stream@3.6.2:
-    dependencies:
-      inherits: 2.0.4
-      string_decoder: 1.3.0
-      util-deprecate: 1.0.2
-
-  safe-buffer@5.2.1: {}
 
   scrypt-js@3.0.1: {}
 
@@ -499,17 +434,9 @@ snapshots:
     dependencies:
       buffer: 6.0.3
 
-  string_decoder@1.3.0:
-    dependencies:
-      safe-buffer: 5.2.1
-
   tr46@0.0.3: {}
 
   typescript@5.4.5: {}
-
-  undici-types@5.26.5: {}
-
-  util-deprecate@1.0.2: {}
 
   uuid@8.3.2: {}
 

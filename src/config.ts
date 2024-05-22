@@ -1,7 +1,7 @@
-import type { Config, ScriptConfigs, ScriptConfig } from "@ckb-lumos/config-manager/lib";
 import {
-    generateGenesisScriptConfigs, predefined, getConfig, initializeConfig as unadaptedInitializeConfig
+    generateGenesisScriptConfigs, predefined, getConfig, initializeConfig as unadaptedInitializeConfig,
 } from "@ckb-lumos/config-manager";
+import type { Config, ScriptConfig } from "@ckb-lumos/config-manager";
 import { I8Script, I8OutPoint, I8CellDep, cellDeps, i8ScriptPadding } from "./cell.js";
 import { getGenesisBlock } from "./rpc.js";
 
@@ -37,29 +37,38 @@ export type ChainInfo = {
 
 let _chainInfo = newChainInfo(addressPrefix() == "ckb" ? "mainnet" : "testnet");
 
+export const errorUntestedLightCLient = "Light client integration has never been actually tested";
 export const errorUnresponsiveRpcUrl = "The provided RPC Url is either unresponsive or invalid";
 export async function initializeChainAdapter(
     chain: Chain,
-    config?: Config,
     rpcUrl: string = defaultRpcUrl(chain),
-    isLightClientRpc: boolean = false
+    isLightClientRpc: boolean = false,
+    ...customizations: (
+        (chain: Chain, scriptConfigs: { [id: string]: ScriptConfigAdapter }
+        ) => { [id: string]: ScriptConfigAdapter })[]
 ) {
+    if (isLightClientRpc) {
+        throw Error(errorUntestedLightCLient);
+    }
+
     if (chain != _chainInfo.chain || rpcUrl !== _chainInfo.rpcUrl) {
         _chainInfo = newChainInfo(chain, rpcUrl, isLightClientRpc);
     }
 
-    if (config !== undefined) {
-        initializeConfig(config);
-    } else if (chain === "mainnet") {
-        initializeConfig(predefined.LINA);
-    } else if (chain === "testnet") {
-        initializeConfig(predefined.AGGRON4);
-    } else {//Devnet        
-        initializeConfig({
-            PREFIX: "ckt",
-            SCRIPTS: generateGenesisScriptConfigs(await getGenesisBlock()),
-        });
+    let config = configAdapterFrom(
+        chain === "mainnet" ? predefined.LINA
+            : chain === "testnet" ? predefined.AGGRON4
+                : {//Devnet 
+                    PREFIX: "ckt",
+                    SCRIPTS: generateGenesisScriptConfigs(await getGenesisBlock()),
+                });
+
+    let scriptConfigs = config.SCRIPTS;
+    for (const customize of customizations) {
+        scriptConfigs = Object.freeze({ ...scriptConfigs, ...customize(chain, scriptConfigs) });
     }
+
+    initializeConfig({ ...config, SCRIPTS: scriptConfigs, });
 }
 
 export function getChainInfo() {
@@ -135,7 +144,7 @@ export function scriptConfigAdapterFrom(scriptConfig: ScriptConfig): ScriptConfi
 }
 
 export function configAdapterFrom(config: Config) {
-    const adaptedScriptConfig: ScriptConfigs = {};
+    const adaptedScriptConfig: { [id: string]: ScriptConfigAdapter } = {};
     for (const scriptName in config.SCRIPTS) {
         adaptedScriptConfig[scriptName] = scriptConfigAdapterFrom(config.SCRIPTS[scriptName]!);
     }
