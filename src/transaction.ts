@@ -358,7 +358,7 @@ export function txSize(tx: TransactionSkeletonType) {
   return serializedTx.byteLength + 4;
 }
 
-export function calculateFee(size: number, feeRate: bigint) {
+export function calculateTxFee(size: number, feeRate: bigint) {
   const ratio = 1000n;
   const base = BigInt(size) * feeRate;
   const fee = base / ratio;

@@ -24,12 +24,7 @@ import {
   since,
   witness,
 } from "./cell.js";
-import {
-  addCells,
-  addHeaderDeps,
-  calculateFee,
-  txSize,
-} from "./transaction.js";
+import { addCells, addHeaderDeps } from "./transaction.js";
 import { hex, scriptEq } from "./utils.js";
 import { Uint64 } from "./codec.js";
 
@@ -204,11 +199,7 @@ export function withdrawalAmountEstimation(
   return calculateMaximumWithdraw(deposit, depositDao, withdrawalRequestDao);
 }
 
-export function ckbDelta(
-  tx: TransactionSkeletonType,
-  feeRate: bigint,
-  config: ConfigAdapter,
-) {
+export function ckbDelta(tx: TransactionSkeletonType, config: ConfigAdapter) {
   let ckbDelta = 0n;
   for (const c of tx.inputs) {
     //Second Withdrawal step from NervosDAO
@@ -229,19 +220,15 @@ export function ckbDelta(
 
   tx.outputs.forEach((c) => (ckbDelta -= BigInt(c.cellOutput.capacity)));
 
-  //Don't account for the tx fee if there are no outputs
-  if (tx.outputs.size > 0 && feeRate > 0n) {
-    ckbDelta -= calculateFee(txSize(tx), feeRate);
-  }
-
   return ckbDelta;
 }
 
+// Note: CKB change cell both in the final tx and txWithPlaceholders is always added as last output cell
 export function addCkbChange(
   tx: TransactionSkeletonType,
   accountLock: I8Script,
-  feeRate: bigint,
   addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
+  calculateTxFee: (txWithPlaceholders: TransactionSkeletonType) => bigint,
   config: ConfigAdapter,
 ) {
   let changeCell = I8Cell.from({ lock: accountLock });
@@ -250,7 +237,9 @@ export function addCkbChange(
   const txWithPlaceholders = addPlaceholders(
     addCells(tx, "append", [], [changeCell]),
   );
-  const delta = ckbDelta(txWithPlaceholders, feeRate, config);
+
+  const txFee = calculateTxFee(txWithPlaceholders);
+  const delta = ckbDelta(txWithPlaceholders, config) - txFee;
 
   if (delta > 0n) {
     changeCell = I8Cell.from({
@@ -265,6 +254,7 @@ export function addCkbChange(
 
   return {
     tx,
+    txFee,
     freeCkb: delta,
   };
 }
