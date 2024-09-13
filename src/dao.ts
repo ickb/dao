@@ -223,33 +223,32 @@ export function ckbDelta(tx: TransactionSkeletonType, config: ConfigAdapter) {
   return ckbDelta;
 }
 
-// Note: CKB change cell both in the final tx and txWithPlaceholders is always added as last output cell
+// Notes:
+// - CKB change cell both in the final tx and txWithDummyChange is always added as last output cell
+// - calculateTxFee must account for signature placeholders
 export function addCkbChange(
   tx: TransactionSkeletonType,
   accountLock: I8Script,
-  addPlaceholders: (tx: TransactionSkeletonType) => TransactionSkeletonType,
-  calculateTxFee: (txWithPlaceholders: TransactionSkeletonType) => bigint,
+  calculateTxFee: (txWithDummyChange: TransactionSkeletonType) => bigint,
   config: ConfigAdapter,
 ) {
   let changeCell = I8Cell.from({ lock: accountLock });
   const usedCkb = BigInt(changeCell.cellOutput.capacity);
 
-  const txWithPlaceholders = addPlaceholders(
-    addCells(tx, "append", [], [changeCell]),
-  );
+  const txWithDummyChange = addCells(tx, "append", [], [changeCell]);
 
-  const txFee = calculateTxFee(txWithPlaceholders);
-  const delta = ckbDelta(txWithPlaceholders, config) - txFee;
+  const txFee = calculateTxFee(txWithDummyChange);
+  const delta = ckbDelta(txWithDummyChange, config) - txFee;
 
   if (delta > 0n) {
     changeCell = I8Cell.from({
       ...changeCell,
       capacity: hex(usedCkb + delta),
     });
-    tx = addPlaceholders(addCells(tx, "append", [], [changeCell]));
+    tx = addCells(tx, "append", [], [changeCell]);
   } else {
     // If delta < 0n, it's a safe invalid transaction, it must be checked with sign of freeCkb.
-    tx = txWithPlaceholders;
+    tx = txWithDummyChange;
   }
 
   return {
