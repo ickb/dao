@@ -1,7 +1,7 @@
 {
-  "name": "@ickb/lumos-utils",
-  "version": "1.4.2",
-  "description": "A small utility framework built on top of ckb-js/lumos",
+  "name": "@ickb/dao",
+  "version": "1000.0.0",
+  "description": "A small NervosDAO utility built on top of CCC",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -18,22 +18,13 @@
   "author": "phroi",
   "license": "MIT",
   "dependencies": {
-    "@ckb-lumos/base": "^0.23.0",
-    "@ckb-lumos/ckb-indexer": "^0.23.0",
-    "@ckb-lumos/codec": "^0.23.0",
-    "@ckb-lumos/common-scripts": "^0.23.0",
-    "@ckb-lumos/config-manager": "^0.23.0",
-    "@ckb-lumos/helpers": "^0.23.0",
-    "@ckb-lumos/light-client": "^0.23.0",
-    "@ckb-lumos/rpc": "^0.23.0",
-    "immutable": "^4.3.7"
+    "@ckb-ccc/core": "canary"
   },
   "devDependencies": {
-    "typescript": "next",
-    "eslint": "^9.12.0",
     "@typescript-eslint/eslint-plugin": "canary",
     "@typescript-eslint/parser": "canary",
-    "prettier": "^3.3.3"
-  },
-  "packageManager": "pnpm@9.12.2+sha256.2ef6e547b0b07d841d605240dce4d635677831148cd30f6d564b8f4f928f73d2"
+    "eslint": "^9.20.1",
+    "prettier": "^3.5.1",
+    "typescript": "next"
+  }
 }

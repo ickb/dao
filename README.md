@@ -1,10 +1,10 @@
-# Lumos Utils
+# iCKB/DAO
 
-A small utility framework that provides utilities for Lumos and CKB transactions.
+A small NervosDAO utility built on top of CCC
 
-## Warning
+## Epoch Semantic Versioning
 
-It's advised against building on top of this library outside iCKB and related Phroi's projects. The absence of docs, the unstable API and the future possibility of it becoming unmaintained make it suitable only as internal library.
+This repository follows [Epoch Semantic Versioning](https://antfu.me/posts/epoch-semver). In short ESV aims to provide a more nuanced and effective way to communicate software changes, allowing for better user understanding and smoother upgrades.
 
 ## Licensing
 
