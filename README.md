@@ -1,6 +1,6 @@
 # iCKB/DAO
 
-A small NervosDAO utility built on top of CCC
+NervosDAO utilities built on top of CCC
 
 ## Epoch Semantic Versioning
 
