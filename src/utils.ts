@@ -7,18 +7,18 @@ export interface TransactionHeader {
 
 export async function getTransactionHeader(
   client: ccc.Client,
-  txHash: ccc.Hex,
+  transactionHash: ccc.Hex,
   knownTransactionHeaders?: Map<ccc.Hex, TransactionHeader>,
   allowedHeaders?: Set<ccc.Hex>,
 ): Promise<TransactionHeader> {
   // Check if it's an already known TransactionHeader
-  let res = knownTransactionHeaders?.get(txHash);
-  if (res && allowedHeaders?.has(res.header.hash) !== false) {
-    return res;
+  let result = knownTransactionHeaders?.get(transactionHash);
+  if (result && allowedHeaders?.has(result.header.hash) !== false) {
+    return result;
   }
 
   // Get the TransactionHeader
-  const data = await client.getTransactionWithHeader(txHash);
+  const data = await client.getTransactionWithHeader(transactionHash);
 
   // Validate TransactionHeader
   if (!data) {
@@ -31,57 +31,117 @@ export async function getTransactionHeader(
   if (allowedHeaders?.has(header.hash) === false) {
     throw new Error("Header not allowed");
   }
-  res = { transaction: transaction.transaction, header };
+
+  result = { transaction: transaction.transaction, header };
 
   // Possibly add it to the known TransactionHeaders
-  knownTransactionHeaders?.set(txHash, res);
+  knownTransactionHeaders?.set(transactionHash, result);
 
-  return res;
+  return result;
 }
 
-// Credits to devrel/ccc/(tools)/NervosDao/page.tsx
-export function getDaoInterests(
-  dao: ccc.Cell,
-  depositHeader: ccc.ClientBlockHeader,
-  withdrawHeader: ccc.ClientBlockHeader,
-): ccc.Num {
-  const occupiedSize = ccc.fixedPointFrom(
-    dao.cellOutput.occupiedSize + ccc.bytesFrom(dao.outputData).length,
-  );
-  const profitableSize = dao.cellOutput.capacity - occupiedSize;
-
-  return (
-    (profitableSize * withdrawHeader.dao.ar) / depositHeader.dao.ar -
-    profitableSize
-  );
+export function discriminateMaturity<T>(
+  tt: readonly T[],
+  maturityOf: (t: T) => ccc.Epoch,
+  tipEpoch: ccc.Epoch,
+) {
+  const mature: T[] = [];
+  const notMature: T[] = [];
+  for (const t of tt) {
+    if (epochCompare(tipEpoch, maturityOf(t)) >= 0) {
+      mature.push(t);
+    } else {
+      notMature.push(t);
+    }
+  }
+  return { mature, notMature };
 }
 
-// Credits to devrel/ccc/(tools)/NervosDao/page.tsx
-export function getDaoClaimEpoch(
-  depositHeader: ccc.ClientBlockHeader,
-  withdrawHeader: ccc.ClientBlockHeader,
-): ccc.Epoch {
-  const depositEpoch = depositHeader.epoch;
-  const withdrawEpoch = withdrawHeader.epoch;
-  const intDiff = withdrawEpoch[0] - depositEpoch[0];
-  // deposit[1]    withdraw[1]
-  // ---------- <= -----------
-  // deposit[2]    withdraw[2]
-  if (
-    intDiff % ccc.numFrom(180) !== ccc.numFrom(0) ||
-    depositEpoch[1] * withdrawEpoch[2] <= depositEpoch[2] * withdrawEpoch[1]
-  ) {
-    return [
-      depositEpoch[0] +
-        (intDiff / ccc.numFrom(180) + ccc.numFrom(1)) * ccc.numFrom(180),
-      depositEpoch[1],
-      depositEpoch[2],
-    ];
+export function epochCompare(a: ccc.Epoch, b: ccc.Epoch): 1 | 0 | -1 {
+  const [aNumber, aIndex, aLength] = a;
+  const [bNumber, bIndex, bLength] = b;
+
+  if (aNumber < bNumber) {
+    return -1;
+  }
+  if (aNumber > bNumber) {
+    return 1;
   }
 
-  return [
-    depositEpoch[0] + (intDiff / ccc.numFrom(180)) * ccc.numFrom(180),
-    depositEpoch[1],
-    depositEpoch[2],
-  ];
+  const v0 = aIndex * bLength;
+  const v1 = bIndex * aLength;
+  if (v0 < v1) {
+    return -1;
+  }
+  if (v0 > v1) {
+    return 1;
+  }
+
+  return 0;
+}
+
+export function epochAdd(epoch: ccc.Epoch, delta: ccc.Epoch): ccc.Epoch {
+  const [eNumber, eIndex, eLength] = epoch;
+  const [dNumber, dIndex, dLength] = delta;
+
+  if (eLength === 0n || dLength === 0n) {
+    throw new Error("Zero EpochSinceValue length");
+  }
+
+  let rawIndex = eIndex;
+  if (eLength !== dLength) {
+    rawIndex += (dIndex * eLength + dLength - 1n) / dLength;
+  } else {
+    rawIndex += dIndex;
+  }
+
+  const length = eLength;
+  const index = rawIndex % length;
+  const number = eNumber + dNumber + (rawIndex - index) / length;
+
+  return [number, index, length];
+}
+
+// Durstenfeld shuffle, see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+export function shuffle<T>(a: readonly T[]) {
+  const array = [...a];
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// BinarySearch is translated from https://go.dev/src/sort/search.go, credits to the respective authors.
+
+// BinarySearch uses binary search to find and return the smallest index i
+// in [0, n) at which f(i) is true, assuming that on the range [0, n),
+// f(i) == true implies f(i+1) == true. That is, Search requires that
+// f is false for some (possibly empty) prefix of the input range [0, n)
+// and then true for the (possibly empty) remainder; Search returns
+// the first true index. If there is no such index, Search returns n.
+// Search calls f(i) only for i in the range [0, n).
+export function binarySearch(n: number, f: (i: number) => boolean): number {
+  // Define f(-1) == false and f(n) == true.
+  // Invariant: f(i-1) == false, f(j) == true.
+  let [i, j] = [0, n];
+  while (i < j) {
+    const h = Math.trunc((i + j) / 2);
+    // i ≤ h < j
+    if (!f(h)) {
+      i = h + 1; // preserves f(i-1) == false
+    } else {
+      j = h; // preserves f(j) == true
+    }
+  }
+  // i == j, f(i-1) == false, and f(j) (= f(i)) == true  =>  answer is i.
+  return i;
+}
+
+export function max<T>(...numbers: T[]) {
+  return numbers.reduce((a, b) => (a > b ? a : b));
+}
+
+export function min<T>(...numbers: T[]) {
+  return numbers.reduce((a, b) => (a < b ? a : b));
 }

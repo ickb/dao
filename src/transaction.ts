@@ -1,9 +1,6 @@
 import { ccc } from "@ckb-ccc/core";
-import {
-  getTransactionHeader,
-  getDaoInterests,
-  type TransactionHeader,
-} from "./utils.js";
+import { getTransactionHeader, type TransactionHeader } from "./utils.js";
+import { DAO_DEPOSIT_DATA, getDaoInterests, getDaoScript } from "./dao.js";
 
 export interface UdtHandler {
   udt: ccc.Script;
@@ -37,7 +34,7 @@ export class SmartTransaction extends ccc.Transaction {
     );
   }
 
-  // Automatically add change cells for UDT for which a handler is defined
+  // Automatically add change cells for both capacity and UDTs for which a handler is defined
   override async completeFee(
     ...args: Parameters<ccc.Transaction["completeFee"]>
   ): ReturnType<ccc.Transaction["completeFee"]> {
@@ -56,6 +53,7 @@ export class SmartTransaction extends ccc.Transaction {
       }
     }
 
+    // Add capacity change cells
     return super.completeFee(...args);
   }
 
@@ -84,11 +82,7 @@ export class SmartTransaction extends ccc.Transaction {
 
   // Account for deposit withdrawals extra capacity
   override async getInputsCapacity(client: ccc.Client): Promise<ccc.Num> {
-    const dao = await ccc.Script.fromKnownScript(
-      client,
-      ccc.KnownScript.NervosDao,
-      "0x",
-    );
+    const dao = await getDaoScript(client);
     const knownTransactionHeaders = new Map<ccc.Hex, TransactionHeader>();
     const allowedHeaders = new Set(this.headerDeps);
     return ccc.reduceAsync(
@@ -270,5 +264,3 @@ export class SmartTransaction extends ccc.Transaction {
 export type SmartTransactionLike = ccc.TransactionLike & {
   udtHandlers?: UdtHandler[];
 };
-
-const DAO_DEPOSIT_DATA = "0x0000000000000000";
