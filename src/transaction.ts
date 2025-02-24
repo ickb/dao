@@ -42,9 +42,20 @@ export class SmartTransaction extends ccc.Transaction {
     ...args: Parameters<ccc.Transaction["completeFee"]>
   ): ReturnType<ccc.Transaction["completeFee"]> {
     const signer = args[0];
+
+    // Add change cells for all defined UDTs
     for (const { udt: udt } of this.udtHandlers) {
       await this.completeInputsByUdt(signer, udt);
     }
+
+    // Double check that all UDTs are even out
+    for (const { udt: udt } of this.udtHandlers) {
+      const addedCount = await this.completeInputsByUdt(signer, udt);
+      if (addedCount > 0) {
+        throw new Error("UDT Handlers did not produce a balanced Transaction");
+      }
+    }
+
     return super.completeFee(...args);
   }
 
@@ -138,6 +149,7 @@ export class SmartTransaction extends ccc.Transaction {
     return this.udtHandlers.find((h) => h.udt.eq(udt));
   }
 
+  // Add UDT Handlers at the end, if not already present
   addUdtHandlers(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
     udtHandlers.flat().forEach((udtHandler) => {
       if (this.udtHandlers.some((h) => h.udt.eq(udtHandler.udt))) {
@@ -146,6 +158,13 @@ export class SmartTransaction extends ccc.Transaction {
 
       this.udtHandlers.push(udtHandler);
     });
+  }
+
+  // Add UDT Handlers at the start, replacing any existing handler for the same UDTs
+  addUdtHandlersAtStart(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
+    const handlers = udtHandlers.flat().concat(this.udtHandlers);
+    this.udtHandlers = [];
+    this.addUdtHandlers(handlers);
   }
 
   addHeaderDeps(...headerDepLikes: (ccc.HexLike | ccc.HexLike[])[]): void {
@@ -171,12 +190,25 @@ export class SmartTransaction extends ccc.Transaction {
     });
   }
 
-  override copy(txLike: SmartTransactionLike): void {
-    // Preserve old UDT handlers with lower priority
+  // Copy from input transaction, while keeping all unique UDT handlers with the following priority:
+  // 1. options.udtHandlers
+  // 2. txLike.udtHandlers
+  // 3. this.udtHandlers
+  override copy(
+    txLike: SmartTransactionLike,
+    options?: { udtHandlers?: UdtHandler[] },
+  ): void {
     const oldUdtHandlers = this.udtHandlers;
 
-    super.copy(txLike);
-    this.udtHandlers = Array.from(txLike.udtHandlers ?? []);
+    const tx = SmartTransaction.from(txLike, options);
+    this.version = tx.version;
+    this.cellDeps = tx.cellDeps;
+    this.headerDeps = tx.headerDeps;
+    this.outputs = tx.outputs;
+    this.outputsData = tx.outputsData;
+    this.witnesses = tx.witnesses;
+    this.udtHandlers = tx.udtHandlers;
+
     this.addUdtHandlers(oldUdtHandlers);
   }
 
@@ -187,12 +219,17 @@ export class SmartTransaction extends ccc.Transaction {
     return SmartTransaction.from(super.fromLumosSkeleton(skeleton), options);
   }
 
+  // Create a transaction from an input transaction,
+  // while keeping all unique UDT handlers with the following priority:
+  // 1. options.udtHandlers
+  // 2. txLike.udtHandlers
   static override from(
     txLike: SmartTransactionLike,
     options?: { udtHandlers?: UdtHandler[] },
   ): SmartTransaction {
-    const optUdtHandlers = options?.udtHandlers;
-    if (txLike instanceof SmartTransaction && !optUdtHandlers) {
+    const optionsUdtHandlers = options?.udtHandlers ?? [];
+
+    if (txLike instanceof SmartTransaction && optionsUdtHandlers.length === 0) {
       return txLike;
     }
 
@@ -204,11 +241,13 @@ export class SmartTransaction extends ccc.Transaction {
       outputs,
       outputsData,
       witnesses,
-    } = ccc.Transaction.from(txLike);
+    } =
+      txLike instanceof SmartTransaction
+        ? txLike
+        : ccc.Transaction.from(txLike);
+    const udtHandlers = txLike.udtHandlers ?? [];
 
-    const udtHandlers = Array.from(optUdtHandlers ?? txLike.udtHandlers ?? []);
-
-    const res = new SmartTransaction(
+    const result = new SmartTransaction(
       version,
       cellDeps,
       headerDeps,
@@ -218,13 +257,8 @@ export class SmartTransaction extends ccc.Transaction {
       witnesses,
       udtHandlers,
     );
-
-    // Preserve old txLike UDT handlers with lower priority
-    if (optUdtHandlers && txLike.udtHandlers) {
-      res.addUdtHandlers(txLike.udtHandlers);
-    }
-
-    return res;
+    result.addUdtHandlersAtStart(optionsUdtHandlers);
+    return result;
   }
 }
 
