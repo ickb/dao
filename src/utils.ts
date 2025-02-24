@@ -13,7 +13,7 @@ export async function getTransactionHeader(
 ): Promise<TransactionHeader> {
   // Check if it's an already known TransactionHeader
   let res = knownTransactionHeaders?.get(txHash);
-  if (res) {
+  if (res && allowedHeaders?.has(res.header.hash) !== false) {
     return res;
   }
 
