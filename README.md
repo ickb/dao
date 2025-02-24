@@ -8,4 +8,4 @@ This repository follows [Epoch Semantic Versioning](https://antfu.me/posts/epoch
 
 ## Licensing
 
-The license for this repository is the MIT License, see the [`LICENSE`](./LICENSE).
+This source code, crafted with care by [Phroi](https://phroi.com/), is freely available on [GitHub](https://github.com/ickb/dao) and it is released under the [MIT License](./LICENSE).
