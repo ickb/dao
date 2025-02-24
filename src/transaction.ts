@@ -146,13 +146,18 @@ export class SmartTransaction extends ccc.Transaction {
   }
 
   getUdtHandler(udt: ccc.ScriptLike): UdtHandler | undefined {
-    return this.udtHandlers.find((h) => h.udt.eq(udt));
+    const s = ccc.Script.from(udt);
+    return this.udtHandlers.find((h) => h.udt.eq(s));
+  }
+
+  hasUdtHandler(udt: ccc.ScriptLike): boolean {
+    return this.getUdtHandler(udt) !== undefined;
   }
 
   // Add UDT Handlers at the end, if not already present
   addUdtHandlers(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
     udtHandlers.flat().forEach((udtHandler) => {
-      if (this.udtHandlers.some((h) => h.udt.eq(udtHandler.udt))) {
+      if (this.hasUdtHandler(udtHandler.udt)) {
         return;
       }
 
