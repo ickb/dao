@@ -24,21 +24,21 @@ export async function getTransactionHeader(
   return { transaction: transaction.transaction, header };
 }
 
-export function discriminateMaturity<T>(
+export function epochPartition<T>(
   tt: readonly T[],
-  maturityOf: (t: T) => ccc.Epoch,
-  tipEpoch: ccc.Epoch,
+  get: (t: T) => ccc.Epoch,
+  reference: ccc.Epoch,
 ) {
-  const mature: T[] = [];
-  const notMature: T[] = [];
+  const before: T[] = [];
+  const after: T[] = [];
   for (const t of tt) {
-    if (epochCompare(tipEpoch, maturityOf(t)) >= 0) {
-      mature.push(t);
+    if (epochCompare(get(t), reference) <= 0) {
+      before.push(t);
     } else {
-      notMature.push(t);
+      after.push(t);
     }
   }
-  return { mature, notMature };
+  return { after, before };
 }
 
 export function epochCompare(a: ccc.Epoch, b: ccc.Epoch): 1 | 0 | -1 {
