@@ -8,15 +8,7 @@ export interface TransactionHeader {
 export async function getTransactionHeader(
   client: ccc.Client,
   transactionHash: ccc.Hex,
-  knownTransactionHeaders?: Map<ccc.Hex, TransactionHeader>,
-  allowedHeaders?: Set<ccc.Hex>,
 ): Promise<TransactionHeader> {
-  // Check if it's an already known TransactionHeader
-  let result = knownTransactionHeaders?.get(transactionHash);
-  if (result && allowedHeaders?.has(result.header.hash) !== false) {
-    return result;
-  }
-
   // Get the TransactionHeader
   const data = await client.getTransactionWithHeader(transactionHash);
 
@@ -28,16 +20,8 @@ export async function getTransactionHeader(
   if (!header) {
     throw new Error("Header not found");
   }
-  if (allowedHeaders?.has(header.hash) === false) {
-    throw new Error("Header not allowed");
-  }
 
-  result = { transaction: transaction.transaction, header };
-
-  // Possibly add it to the known TransactionHeaders
-  knownTransactionHeaders?.set(transactionHash, result);
-
-  return result;
+  return { transaction: transaction.transaction, header };
 }
 
 export function discriminateMaturity<T>(

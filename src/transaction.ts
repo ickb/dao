@@ -1,17 +1,18 @@
 import { ccc } from "@ckb-ccc/core";
-import { getTransactionHeader, type TransactionHeader } from "./utils.js";
 import { DAO_DEPOSIT_DATA, getDaoInterests, getDaoScript } from "./dao.js";
+import { getTransactionHeader, type TransactionHeader } from "./utils.js";
 
 export interface UdtHandler {
   udt: ccc.Script;
   getInputsUdtBalance?: (
     client: ccc.Client,
-    udt: ccc.Script,
-    tx: ccc.Transaction,
+    tx: SmartTransaction,
   ) => Promise<bigint>;
-  getOutputsUdtBalance?: (udt: ccc.Script, tx: ccc.Transaction) => bigint;
+  getOutputsUdtBalance?: (tx: SmartTransaction) => bigint;
 }
 
+// udtHandlers and transactionHeaders are always shared among descendants.
+// transactionHeaders may not contain all headers referenced by headerDeps.
 export class SmartTransaction extends ccc.Transaction {
   constructor(
     version: ccc.Num,
@@ -21,7 +22,8 @@ export class SmartTransaction extends ccc.Transaction {
     outputs: ccc.CellOutput[],
     outputsData: ccc.Hex[],
     witnesses: ccc.Hex[],
-    public udtHandlers: UdtHandler[],
+    public udtHandlers: Map<string, UdtHandler>,
+    public transactionHeaders: Map<ccc.Hex, TransactionHeader>,
   ) {
     super(
       version,
@@ -37,16 +39,16 @@ export class SmartTransaction extends ccc.Transaction {
   // Automatically add change cells for both capacity and UDTs for which a handler is defined
   override async completeFee(
     ...args: Parameters<ccc.Transaction["completeFee"]>
-  ): ReturnType<ccc.Transaction["completeFee"]> {
+  ): Promise<[number, boolean]> {
     const signer = args[0];
 
     // Add change cells for all defined UDTs
-    for (const { udt: udt } of this.udtHandlers) {
+    for (const { udt } of this.udtHandlers.values()) {
       await this.completeInputsByUdt(signer, udt);
     }
 
     // Double check that all UDTs are even out
-    for (const { udt: udt } of this.udtHandlers) {
+    for (const { udt } of this.udtHandlers.values()) {
       const addedCount = await this.completeInputsByUdt(signer, udt);
       if (addedCount > 0) {
         throw new Error("UDT Handlers did not produce a balanced Transaction");
@@ -57,34 +59,30 @@ export class SmartTransaction extends ccc.Transaction {
     return super.completeFee(...args);
   }
 
-  // Use input UDT handler if it exists
-  override async getInputsUdtBalance(
+  // Use input UDT handler if it exists, otherwise the use default one
+  override getInputsUdtBalance(
     client: ccc.Client,
     udtLike: ccc.ScriptLike,
   ): Promise<bigint> {
     const udt = ccc.Script.from(udtLike);
-    const getInputsBalance = this.getUdtHandler(udt)?.getInputsUdtBalance;
-    if (getInputsBalance) {
-      return getInputsBalance(client, udt, this);
-    }
-    return super.getInputsUdtBalance(client, udt);
+    return (
+      this.getUdtHandler(udt)?.getInputsUdtBalance?.(client, this) ??
+      super.getInputsUdtBalance(client, udt)
+    );
   }
 
-  // Use output UDT handler if it exists
+  // Use output UDT handler if it exists, otherwise the use default one
   override getOutputsUdtBalance(udtLike: ccc.ScriptLike): bigint {
     const udt = ccc.Script.from(udtLike);
-    const getOutputsBalance = this.getUdtHandler(udt)?.getOutputsUdtBalance;
-    if (getOutputsBalance) {
-      return getOutputsBalance(udt, this);
-    }
-    return super.getOutputsUdtBalance(udt);
+    return (
+      this.getUdtHandler(udt)?.getOutputsUdtBalance?.(this) ??
+      super.getOutputsUdtBalance(udt)
+    );
   }
 
   // Account for deposit withdrawals extra capacity
   override async getInputsCapacity(client: ccc.Client): Promise<ccc.Num> {
     const dao = await getDaoScript(client);
-    const knownTransactionHeaders = new Map<ccc.Hex, TransactionHeader>();
-    const allowedHeaders = new Set(this.headerDeps);
     return ccc.reduceAsync(
       this.inputs,
       async (total, input) => {
@@ -105,11 +103,9 @@ export class SmartTransaction extends ccc.Transaction {
         }
 
         // Get header of NervosDAO cell and check its inclusion in HeaderDeps
-        const { transaction, header } = await getTransactionHeader(
+        const { transaction, header } = await this.getTransactionHeader(
           client,
           previousOutput.txHash,
-          knownTransactionHeaders,
-          allowedHeaders,
         );
 
         // If deposit cell, so no additional interests, return
@@ -118,12 +114,10 @@ export class SmartTransaction extends ccc.Transaction {
         }
 
         // It's a withdrawal request cell, get header of previous deposit cell
-        const { header: depositHeader } = await getTransactionHeader(
+        const { header: depositHeader } = await this.getTransactionHeader(
           client,
           transaction.inputs[Number(previousOutput.index)].previousOutput
             .txHash,
-          knownTransactionHeaders,
-          allowedHeaders,
         );
 
         return (
@@ -139,96 +133,118 @@ export class SmartTransaction extends ccc.Transaction {
     );
   }
 
+  static getUdtKey(udt: ccc.ScriptLike): string {
+    return ccc.Script.from(udt).toBytes().toString();
+  }
+
   getUdtHandler(udt: ccc.ScriptLike): UdtHandler | undefined {
-    const s = ccc.Script.from(udt);
-    return this.udtHandlers.find((h) => h.udt.eq(s));
+    return this.udtHandlers.get(SmartTransaction.getUdtKey(udt));
   }
 
   hasUdtHandler(udt: ccc.ScriptLike): boolean {
-    return this.getUdtHandler(udt) !== undefined;
+    return this.udtHandlers.has(SmartTransaction.getUdtKey(udt));
   }
 
-  // Add UDT Handlers at the end, if not already present
+  // Add UDT Handlers, substitute in-place if present
   addUdtHandlers(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
     udtHandlers.flat().forEach((udtHandler) => {
-      if (this.hasUdtHandler(udtHandler.udt)) {
-        return;
-      }
-
-      this.udtHandlers.push(udtHandler);
+      this.udtHandlers.set(
+        SmartTransaction.getUdtKey(udtHandler.udt),
+        udtHandler,
+      );
     });
   }
 
-  // Add UDT Handlers at the start, replacing any existing handler for the same UDTs
-  addUdtHandlersAtStart(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
-    const handlers = udtHandlers.flat().concat(this.udtHandlers);
-    this.udtHandlers = [];
-    this.addUdtHandlers(handlers);
+  // Add Headers both to headerDeps and transactionHeaders,
+  // substituted in-place if already present
+  addTransactionHeaders(
+    ...transactionHeaders: (TransactionHeader | TransactionHeader[])[]
+  ): void {
+    transactionHeaders.flat().forEach((transactionHeader) => {
+      const headerDep = transactionHeader.header.hash;
+      const headerDepIndex = this.headerDeps.findIndex((h) => h === headerDep);
+      if (headerDepIndex === -1) {
+        this.headerDeps.push(headerDep);
+      } /*else { // Commented out as it doesn't change anything
+        this.headerDeps[headerDepIndex] = headerDep;
+      }*/
+
+      this.transactionHeaders.set(
+        transactionHeader.transaction.hash(),
+        transactionHeader,
+      );
+    });
   }
 
-  addHeaderDeps(...headerDepLikes: (ccc.HexLike | ccc.HexLike[])[]): void {
-    headerDepLikes.flat().forEach((headerDepLike) => {
-      const headerDep = ccc.hexFrom(headerDepLike);
-      if (this.headerDeps.some((h) => h === headerDep)) {
-        return;
-      }
+  // Get a TransactionHeader when its Header hash already exists in HeaderDeps
+  // Possibly recording it to transaction's transactionHeaders
+  async getTransactionHeader(
+    client: ccc.Client,
+    transactionHash: ccc.Hex,
+  ): Promise<TransactionHeader> {
+    let result = this.transactionHeaders.get(transactionHash);
+    if (!result) {
+      result = await getTransactionHeader(client, transactionHash);
+      // Record it in transactionHeaders
+      this.transactionHeaders.set(transactionHash, result);
+    }
 
-      this.headerDeps.push(headerDep);
-    });
+    // Check that its Header hash already exists in HeaderDeps
+    const headerDep = result.header.hash;
+    if (!this.headerDeps.some((h) => h === headerDep)) {
+      throw new Error("Header not found in HeaderDeps");
+    }
+
+    return result;
   }
 
   // Override all methods that transform ccc.Transaction(s)
 
   static override default(): SmartTransaction {
-    return new SmartTransaction(0n, [], [], [], [], [], [], []);
+    return new SmartTransaction(
+      0n,
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      new Map(),
+      new Map(),
+    );
   }
 
+  // Clone the Transaction part and share udtHandlers and transactionHeaders
   override clone(): SmartTransaction {
-    return SmartTransaction.from(super.clone(), {
-      udtHandlers: this.udtHandlers,
-    });
+    const result = SmartTransaction.from(super.clone());
+    result.udtHandlers = this.udtHandlers;
+    result.transactionHeaders = this.transactionHeaders;
+    return result;
   }
 
-  // Copy from input transaction, while keeping all unique UDT handlers with the following priority:
-  // 1. options.udtHandlers
-  // 2. txLike.udtHandlers
-  // 3. this.udtHandlers
-  override copy(
-    txLike: SmartTransactionLike,
-    options?: { udtHandlers?: UdtHandler[] },
-  ): void {
-    const oldUdtHandlers = this.udtHandlers;
-
-    const tx = SmartTransaction.from(txLike, options);
+  // Copy from input transaction
+  override copy(txLike: SmartTransactionLike): void {
+    const tx = SmartTransaction.from(txLike);
     this.version = tx.version;
     this.cellDeps = tx.cellDeps;
     this.headerDeps = tx.headerDeps;
+    this.inputs = tx.inputs;
     this.outputs = tx.outputs;
     this.outputsData = tx.outputsData;
     this.witnesses = tx.witnesses;
     this.udtHandlers = tx.udtHandlers;
-
-    this.addUdtHandlers(oldUdtHandlers);
+    this.transactionHeaders = tx.transactionHeaders;
   }
 
   static override fromLumosSkeleton(
     skeleton: ccc.LumosTransactionSkeletonType,
-    options?: { udtHandlers?: UdtHandler[] },
   ): SmartTransaction {
-    return SmartTransaction.from(super.fromLumosSkeleton(skeleton), options);
+    return SmartTransaction.from(super.fromLumosSkeleton(skeleton));
   }
 
-  // Create a transaction from an input transaction,
-  // while keeping all unique UDT handlers with the following priority:
-  // 1. options.udtHandlers
-  // 2. txLike.udtHandlers
-  static override from(
-    txLike: SmartTransactionLike,
-    options?: { udtHandlers?: UdtHandler[] },
-  ): SmartTransaction {
-    const optionsUdtHandlers = options?.udtHandlers ?? [];
-
-    if (txLike instanceof SmartTransaction && optionsUdtHandlers.length === 0) {
+  // Create a transaction from an input transaction and share udtHandlers and transactionHeaders
+  static override from(txLike: SmartTransactionLike): SmartTransaction {
+    if (txLike instanceof SmartTransaction) {
       return txLike;
     }
 
@@ -240,13 +256,13 @@ export class SmartTransaction extends ccc.Transaction {
       outputs,
       outputsData,
       witnesses,
-    } =
-      txLike instanceof SmartTransaction
-        ? txLike
-        : ccc.Transaction.from(txLike);
-    const udtHandlers = txLike.udtHandlers ?? [];
+    } = ccc.Transaction.from(txLike);
 
-    const result = new SmartTransaction(
+    const udtHandlers = txLike.udtHandlers ?? new Map<string, UdtHandler>();
+    const transactionHeaders =
+      txLike.transactionHeaders ?? new Map<ccc.Hex, TransactionHeader>();
+
+    return new SmartTransaction(
       version,
       cellDeps,
       headerDeps,
@@ -255,12 +271,12 @@ export class SmartTransaction extends ccc.Transaction {
       outputsData,
       witnesses,
       udtHandlers,
+      transactionHeaders,
     );
-    result.addUdtHandlersAtStart(optionsUdtHandlers);
-    return result;
   }
 }
 
 export type SmartTransactionLike = ccc.TransactionLike & {
-  udtHandlers?: UdtHandler[];
+  udtHandlers?: Map<string, UdtHandler>;
+  transactionHeaders?: Map<ccc.Hex, TransactionHeader>;
 };
