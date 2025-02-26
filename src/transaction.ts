@@ -1,6 +1,6 @@
 import { ccc } from "@ckb-ccc/core";
-import { DAO_DEPOSIT_DATA, getDaoInterests, getDaoScript } from "./dao.js";
 import { getTransactionHeader, type TransactionHeader } from "./utils.js";
+import { Dao } from "./dao.js";
 
 export interface UdtHandler {
   udt: ccc.Script;
@@ -82,7 +82,7 @@ export class SmartTransaction extends ccc.Transaction {
 
   // Account for deposit withdrawals extra capacity
   override async getInputsCapacity(client: ccc.Client): Promise<ccc.Num> {
-    const dao = await getDaoScript(client);
+    const dao = await Dao.from(client);
     return ccc.reduceAsync(
       this.inputs,
       async (total, input) => {
@@ -94,11 +94,12 @@ export class SmartTransaction extends ccc.Transaction {
         if (!cellOutput || !outputData) {
           throw new Error("Unable to complete input");
         }
+        const cell = ccc.Cell.from({ previousOutput, cellOutput, outputData });
 
         total += cellOutput.capacity;
 
-        // If not NervosDAO cell, so no additional interests, return
-        if (!cellOutput.type || !dao.eq(cellOutput.type)) {
+        // If not Withdrawal Request cell, so no additional interests, return
+        if (!dao.isWithdrawalRequest(cell)) {
           return total;
         }
 
@@ -108,11 +109,6 @@ export class SmartTransaction extends ccc.Transaction {
           previousOutput.txHash,
         );
 
-        // If deposit cell, so no additional interests, return
-        if (outputData === DAO_DEPOSIT_DATA) {
-          return total;
-        }
-
         // It's a withdrawal request cell, get header of previous deposit cell
         const { header: depositHeader } = await this.getTransactionHeader(
           client,
@@ -120,14 +116,7 @@ export class SmartTransaction extends ccc.Transaction {
             .txHash,
         );
 
-        return (
-          total +
-          getDaoInterests(
-            ccc.Cell.from({ previousOutput, cellOutput, outputData }),
-            depositHeader,
-            header,
-          )
-        );
+        return total + Dao.getInterests(cell, depositHeader, header);
       },
       ccc.numFrom(0),
     );
