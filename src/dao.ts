@@ -3,7 +3,7 @@ import { ccc } from "@ckb-ccc/core";
 export class Dao {
   constructor(
     public script: ccc.Script,
-    public cellDepInfos: ccc.CellDepInfo[],
+    public cellDepInfos: ccc.CellDep[],
   ) {}
 
   static async from(client: ccc.Client): Promise<Dao> {
@@ -11,25 +11,32 @@ export class Dao {
       ccc.KnownScript.NervosDao,
     );
     const script = ccc.Script.from({ codeHash, hashType, args: "0x" });
-    return new Dao(script, cellDeps);
+    return new Dao(
+      script,
+      cellDeps.map((d) => d.cellDep),
+    );
+  }
+
+  is(cell: ccc.CellLike): boolean {
+    const type = cell.cellOutput.type;
+    return !!type && this.script.eq(type);
+  }
+
+  hasDepositData(cell: ccc.CellLike): boolean {
+    return (
+      Dao.depositData() ===
+      (cell instanceof ccc.Cell
+        ? cell.outputData
+        : ccc.hexFrom(cell.outputData))
+    );
   }
 
   isDeposit(cell: ccc.CellLike): boolean {
-    const {
-      cellOutput: { type },
-      outputData,
-    } = ccc.Cell.from(cell);
-
-    return outputData === Dao.depositData() && type?.eq(this.script) === true;
+    return this.is(cell) && this.hasDepositData(cell);
   }
 
-  isWithdrawalRequest(cell: ccc.CellLike): boolean {
-    const {
-      cellOutput: { type },
-      outputData,
-    } = ccc.Cell.from(cell);
-
-    return outputData !== Dao.depositData() && type?.eq(this.script) === true;
+  isWithdrawal(cell: ccc.CellLike): boolean {
+    return this.is(cell) && !this.hasDepositData(cell);
   }
 
   static depositData(): ccc.Hex {
