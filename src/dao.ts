@@ -1,9 +1,10 @@
 import { ccc } from "@ckb-ccc/core";
+import type { SmartTransaction } from "./transaction.js";
 
 export class Dao {
   constructor(
     public script: ccc.Script,
-    public cellDepInfos: ccc.CellDep[],
+    public cellDep: ccc.CellDep[],
   ) {}
 
   static async from(client: ccc.Client): Promise<Dao> {
@@ -41,6 +42,27 @@ export class Dao {
 
   static depositData(): ccc.Hex {
     return "0x0000000000000000";
+  }
+
+  deposit(
+    tx: SmartTransaction,
+    capacities: readonly ccc.Num[],
+    to: ccc.ScriptLike,
+  ) {
+    tx.addCellDeps(this.cellDep);
+
+    for (const capacity of capacities) {
+      tx.addOutput(
+        {
+          capacity,
+          lock: to,
+          type: this.script,
+        },
+        Dao.depositData(),
+      );
+    }
+
+    return tx;
   }
 
   // Credits to Hanssen from CKB DevRel:
