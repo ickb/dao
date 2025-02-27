@@ -1,6 +1,6 @@
 import { ccc } from "@ckb-ccc/core";
 import { getTransactionHeader, type TransactionHeader } from "./utils.js";
-import { Dao } from "./dao.js";
+import { Dao, WithdrawalRequest } from "./dao.js";
 
 export interface UdtHandler {
   udt: ccc.Script;
@@ -104,7 +104,7 @@ export class SmartTransaction extends ccc.Transaction {
         }
 
         // Get header of NervosDAO cell and check its inclusion in HeaderDeps
-        const { transaction, header } = await this.getTransactionHeader(
+        const transactionHeader = await this.getTransactionHeader(
           client,
           previousOutput.txHash,
         );
@@ -115,13 +115,19 @@ export class SmartTransaction extends ccc.Transaction {
         }
 
         // It's a withdrawal request cell, get header of previous deposit cell
-        const { header: depositHeader } = await this.getTransactionHeader(
+        const depositTransactionHeader = await this.getTransactionHeader(
           client,
-          transaction.inputs[Number(previousOutput.index)].previousOutput
-            .txHash,
+          transactionHeader.transaction.inputs[Number(previousOutput.index)]
+            .previousOutput.txHash,
         );
 
-        return total + Dao.getInterests(cell, depositHeader, header);
+        const withdrawalRequest = new WithdrawalRequest(
+          cell,
+          depositTransactionHeader,
+          transactionHeader,
+        );
+
+        return total + withdrawalRequest.interests;
       },
       ccc.numFrom(0),
     );
