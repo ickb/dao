@@ -155,7 +155,7 @@ export class Dao {
     const tipHeader = tip
       ? ccc.ClientBlockHeader.from(tip)
       : await client.getTipHeader();
-    for await (const cell of client.findCells(
+    for await (const cell of client.findCellsOnChain(
       {
         script: lock,
         scriptType: "lock",
@@ -185,7 +185,7 @@ export class Dao {
     client: ccc.Client,
     lock: ccc.ScriptLike,
   ): AsyncGenerator<WithdrawalRequest> {
-    for await (const cell of client.findCells(
+    for await (const cell of client.findCellsOnChain(
       {
         script: lock,
         scriptType: "lock",
