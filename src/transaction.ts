@@ -98,8 +98,8 @@ export class SmartTransaction extends ccc.Transaction {
 
         total += cellOutput.capacity;
 
-        // If not a NervosDAO cell, return
-        if (!dao.is(cell)) {
+        // If not a NervosDAO Withdrawal Request cell, return
+        if (!dao.isWithdrawalRequest(cell)) {
           return total;
         }
 
@@ -108,11 +108,6 @@ export class SmartTransaction extends ccc.Transaction {
           client,
           previousOutput.txHash,
         );
-
-        // If it's a deposit cell, so no additional interests, return
-        if (dao.hasDepositData(cell)) {
-          return total;
-        }
 
         // It's a withdrawal request cell, get header of previous deposit cell
         const depositTransactionHeader = await this.getTransactionHeader(

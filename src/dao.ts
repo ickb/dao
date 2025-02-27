@@ -1,6 +1,10 @@
-import { ccc, WitnessArgs } from "@ckb-ccc/core";
+import { ccc } from "@ckb-ccc/core";
 import type { SmartTransaction } from "./transaction.js";
-import { getTransactionHeader, type TransactionHeader } from "./utils.js";
+import {
+  epochCompare,
+  getTransactionHeader,
+  type TransactionHeader,
+} from "./utils.js";
 
 export class Dao {
   constructor(
@@ -19,33 +23,33 @@ export class Dao {
     );
   }
 
-  is(cell: ccc.CellLike): boolean {
-    const type = cell.cellOutput.type;
-    return !!type && this.script.eq(type);
-  }
-
-  hasDepositData(cell: ccc.CellLike): boolean {
-    return (
-      Dao.depositData() ===
-      (cell instanceof ccc.Cell
-        ? cell.outputData
-        : ccc.hexFrom(cell.outputData))
-    );
-  }
-
   isDeposit(cell: ccc.CellLike): boolean {
-    return this.is(cell) && this.hasDepositData(cell);
+    const {
+      cellOutput: { type },
+      outputData,
+    } = ccc.Cell.from(cell);
+
+    return outputData === Dao.depositData() && type?.eq(this.script) === true;
   }
 
   isWithdrawalRequest(cell: ccc.CellLike): boolean {
-    return this.is(cell) && !this.hasDepositData(cell);
+    const {
+      cellOutput: { type },
+      outputData,
+    } = ccc.Cell.from(cell);
+
+    return outputData !== Dao.depositData() && type?.eq(this.script) === true;
   }
 
   static depositData(): ccc.Hex {
     return "0x0000000000000000";
   }
 
-  deposit(tx: SmartTransaction, capacities: ccc.Num[], lock: ccc.ScriptLike) {
+  deposit(
+    tx: SmartTransaction,
+    capacities: ccc.Num[],
+    lock: ccc.ScriptLike,
+  ): SmartTransaction {
     tx.addCellDeps(this.cellDep);
 
     const l = ccc.Script.from(lock);
@@ -68,13 +72,12 @@ export class Dao {
     deposits: Deposit[],
     lock: ccc.ScriptLike,
     sameSizeArgs = true,
-  ) {
+  ): SmartTransaction {
     if (
-      tx.inputs.length > 0 ||
-      tx.outputs.length > 0 ||
-      tx.outputsData.length > 0
+      tx.inputs.length != tx.outputs.length ||
+      tx.outputs.length != tx.outputsData.length
     ) {
-      throw new Error("Request Withdrawal only on empty Transactions");
+      throw new Error("Transaction have different inputs and outputs lengths");
     }
 
     tx.addCellDeps(this.cellDep);
@@ -83,7 +86,9 @@ export class Dao {
     for (const deposit of deposits) {
       const { cell, transactionHeaders } = deposit;
       if (sameSizeArgs && cell.cellOutput.lock.args.length != l.args.length) {
-        throw new Error("Withdrawal request lock args has different size");
+        throw new Error(
+          "Withdrawal request lock args has different size from deposit",
+        );
       }
 
       tx.addTransactionHeaders(transactionHeaders);
@@ -101,7 +106,10 @@ export class Dao {
     return tx;
   }
 
-  withdraw(tx: SmartTransaction, withdrawalRequests: WithdrawalRequest[]) {
+  withdraw(
+    tx: SmartTransaction,
+    withdrawalRequests: WithdrawalRequest[],
+  ): SmartTransaction {
     tx.addCellDeps(this.cellDep);
 
     for (const withdrawalRequest of withdrawalRequests) {
@@ -127,9 +135,10 @@ export class Dao {
           },
         }) - 1;
 
-      const witness = tx.getWitnessArgsAt(inputIndex) ?? WitnessArgs.from({});
+      const witness =
+        tx.getWitnessArgsAt(inputIndex) ?? ccc.WitnessArgs.from({});
       if (witness.inputType) {
-        throw new Error("Witnesses of WithdrawalRequest already in use");
+        throw new Error("Witnesses of withdrawal request already in use");
       }
       witness.inputType = ccc.hexFrom(ccc.numLeToBytes(headerIndex, 8));
       tx.setWitnessArgsAt(inputIndex, witness);
@@ -142,7 +151,7 @@ export class Dao {
     client: ccc.Client,
     lock: ccc.ScriptLike,
     tip?: ccc.ClientBlockHeaderLike,
-  ) {
+  ): AsyncGenerator<Deposit> {
     const tipHeader = tip
       ? ccc.ClientBlockHeader.from(tip)
       : await client.getTipHeader();
@@ -172,7 +181,10 @@ export class Dao {
     }
   }
 
-  async *findWithdrawalRequests(client: ccc.Client, lock: ccc.ScriptLike) {
+  async *findWithdrawalRequests(
+    client: ccc.Client,
+    lock: ccc.ScriptLike,
+  ): AsyncGenerator<WithdrawalRequest> {
     for await (const cell of client.findCells(
       {
         script: lock,
@@ -229,6 +241,10 @@ export class WithdrawalRequest {
     );
     this.maturity = getMaturity(deposit.header, withdrawalRequest.header);
   }
+
+  maturityCompare(other: WithdrawalRequest): 0 | 1 | -1 {
+    return epochCompare(this.maturity, other.maturity);
+  }
 }
 
 export class Deposit extends WithdrawalRequest {
@@ -244,7 +260,7 @@ export class Deposit extends WithdrawalRequest {
     this.transactionHeaders.pop();
   }
 
-  update(tip: ccc.ClientBlockHeader) {
+  update(tip: ccc.ClientBlockHeader): void {
     const depositHeader = this.transactionHeaders[0].header;
     this.interests = getInterests(this.cell, depositHeader, tip);
     this.maturity = getMaturity(depositHeader, tip);
