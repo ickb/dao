@@ -1,4 +1,4 @@
-import { ccc } from "@ckb-ccc/core";
+import { ccc, WitnessArgs } from "@ckb-ccc/core";
 import type { SmartTransaction } from "./transaction.js";
 import { getTransactionHeader, type TransactionHeader } from "./utils.js";
 
@@ -127,14 +127,12 @@ export class Dao {
           },
         }) - 1;
 
-      if (tx.witnesses[inputIndex]) {
+      const witness = tx.getWitnessArgsAt(inputIndex) ?? WitnessArgs.from({});
+      if (witness.inputType) {
         throw new Error("Witnesses of WithdrawalRequest already in use");
       }
-      tx.witnesses[inputIndex] = ccc.hexFrom(
-        ccc.WitnessArgs.from({
-          inputType: ccc.numLeToBytes(headerIndex, 8),
-        }).toBytes(),
-      );
+      witness.inputType = ccc.hexFrom(ccc.numLeToBytes(headerIndex, 8));
+      tx.setWitnessArgsAt(inputIndex, witness);
     }
 
     return tx;
