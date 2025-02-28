@@ -6,13 +6,28 @@ import {
   type TransactionHeader,
 } from "./utils.js";
 
+/**
+ * Represents NervosDAO functionalities.
+ */
 export class Dao {
+  /**
+   * Creates an instance of the Dao class.
+   *
+   * @param script - The script associated with the NervosDAO.
+   * @param cellDep - An array of cell dependencies for the NervosDAO.
+   */
   constructor(
     public script: ccc.Script,
     public cellDep: ccc.CellDep[],
   ) {}
 
-  static async from(client: ccc.Client): Promise<Dao> {
+  /**
+   * Creates a new instance of the Dao class from a client.
+   *
+   * @param client - The client used to interact with the blockchain.
+   * @returns A promise that resolves to a new Dao instance.
+   */
+  static async newFrom(client: ccc.Client): Promise<Dao> {
     const { hashType, codeHash, cellDeps } = await client.getKnownScript(
       ccc.KnownScript.NervosDao,
     );
@@ -23,6 +38,12 @@ export class Dao {
     );
   }
 
+  /**
+   * Checks if a given cell is a deposit.
+   *
+   * @param cell - The cell to check.
+   * @returns True if the cell is a deposit, otherwise false.
+   */
   isDeposit(cell: ccc.CellLike): boolean {
     const {
       cellOutput: { type },
@@ -32,6 +53,12 @@ export class Dao {
     return outputData === Dao.depositData() && type?.eq(this.script) === true;
   }
 
+  /**
+   * Checks if a given cell is a withdrawal request.
+   *
+   * @param cell - The cell to check.
+   * @returns True if the cell is a withdrawal request, otherwise false.
+   */
   isWithdrawalRequest(cell: ccc.CellLike): boolean {
     const {
       cellOutput: { type },
@@ -41,15 +68,28 @@ export class Dao {
     return outputData !== Dao.depositData() && type?.eq(this.script) === true;
   }
 
+  /**
+   * Returns the deposit data.
+   *
+   * @returns The deposit data as a hexadecimal string.
+   */
   static depositData(): ccc.Hex {
     return "0x0000000000000000";
   }
 
+  /**
+   * Adds a deposit to a transaction.
+   *
+   * @param tx - The transaction to which the deposit will be added.
+   * @param capacities - An array of capacities of the deposits to create.
+   * @param lock - The lock script for the outputs.
+   * @returns void.
+   */
   deposit(
     tx: SmartTransaction,
     capacities: ccc.Num[],
     lock: ccc.ScriptLike,
-  ): SmartTransaction {
+  ): void {
     tx.addCellDeps(this.cellDep);
 
     const l = ccc.Script.from(lock);
@@ -63,10 +103,20 @@ export class Dao {
         Dao.depositData(),
       );
     }
-
-    return tx;
   }
 
+  /**
+   * Requests withdrawal from NervosDAO deposits.
+   *
+   * @param tx - The transaction to which the withdrawal request will be added.
+   * @param deposits - An array of deposits to request the withdrawal from.
+   * @param lock - The lock script for the withdrawal request cells.
+   * @param sameSizeArgs - Whether to enforce the same size for lock args (default: true).
+   * @returns void.
+   * @throws Error if the transaction has different input and output lengths.
+   * @throws Error if the withdrawal request lock args have a different size from the deposit.
+   * @throws Error if the transaction or header of deposit is not found.
+   */
   requestWithdrawal(
     tx: SmartTransaction,
     deposits: Deposit[],
@@ -106,10 +156,14 @@ export class Dao {
     return tx;
   }
 
-  withdraw(
-    tx: SmartTransaction,
-    withdrawalRequests: WithdrawalRequest[],
-  ): SmartTransaction {
+  /**
+   * Withdraws funds from the NervosDAO based on the provided mature withdrawal requests.
+   *
+   * @param tx - The transaction to which the withdrawal will be added.
+   * @param withdrawalRequests - An array of withdrawal requests to process.
+   * @returns void.
+   */
+  withdraw(tx: SmartTransaction, withdrawalRequests: WithdrawalRequest[]) {
     tx.addCellDeps(this.cellDep);
 
     for (const withdrawalRequest of withdrawalRequests) {
@@ -143,10 +197,16 @@ export class Dao {
       witness.inputType = ccc.hexFrom(ccc.numLeToBytes(headerIndex, 8));
       tx.setWitnessArgsAt(inputIndex, witness);
     }
-
-    return tx;
   }
 
+  /**
+   * Asynchronously finds deposits associated with a given lock script.
+   *
+   * @param client - The client used to interact with the blockchain.
+   * @param lock - The lock script to filter deposits.
+   * @param tip - An optional tip block header to use as a reference.
+   * @returns An async generator that yields Deposit objects.
+   */
   async *findDeposits(
     client: ccc.Client,
     lock: ccc.ScriptLike,
@@ -181,6 +241,13 @@ export class Dao {
     }
   }
 
+  /**
+   * Asynchronously finds withdrawal requests associated with a given lock script.
+   *
+   * @param client - The client used to interact with the blockchain.
+   * @param lock - The lock script to filter withdrawal requests.
+   * @returns An async generator that yields WithdrawalRequest objects.
+   */
   async *findWithdrawalRequests(
     client: ccc.Client,
     lock: ccc.ScriptLike,
@@ -222,11 +289,29 @@ export class Dao {
   }
 }
 
-export class WithdrawalRequest {
+/**
+ * Abstract class representing a NervosDAO cell.
+ * This class serves as a base for specific types of NervosDAO cells, such as deposits and withdrawal requests.
+ */
+export abstract class DaoCell {
+  /** The cell associated with this NervosDAO cell. */
   public cell: ccc.Cell;
+
+  /** An array of transaction headers related to this NervosDAO cell. */
   public transactionHeaders: TransactionHeader[];
+
+  /** The interests accrued for this NervosDAO cell. */
   public interests: ccc.Num;
+
+  /** The maturity epoch of this NervosDAO cell. */
   public maturity: ccc.Epoch;
+
+  /**
+   * Creates an instance of DaoCell.
+   * @param cell - The cell associated with this NervosDAO cell.
+   * @param deposit - The transaction header for the deposit.
+   * @param withdrawalRequest - The transaction header for the withdrawal request.
+   */
   constructor(
     cell: ccc.Cell,
     deposit: TransactionHeader,
@@ -242,12 +327,27 @@ export class WithdrawalRequest {
     this.maturity = getMaturity(deposit.header, withdrawalRequest.header);
   }
 
-  maturityCompare(other: WithdrawalRequest): 0 | 1 | -1 {
+  /**
+   * Compares the maturity of this NervosDAO cell with another NervosDAO cell.
+   * @param other - The other NervosDAO cell to compare against.
+   * @returns 1 if this cell is more mature, 0 if they are equal, -1 if this cell is less mature.
+   */
+  maturityCompare(other: DaoCell): 1 | 0 | -1 {
     return epochCompare(this.maturity, other.maturity);
   }
 }
 
-export class Deposit extends WithdrawalRequest {
+/**
+ * Class representing a deposit in NervosDAO.
+ * Inherits from DaoCell and represents a specific type of NervosDAO cell for deposits.
+ */
+export class Deposit extends DaoCell {
+  /**
+   * Creates an instance of Deposit.
+   * @param cell - The cell associated with this deposit.
+   * @param deposit - The transaction header for the deposit.
+   * @param tip - The client block header representing the latest block.
+   */
   constructor(
     cell: ccc.Cell,
     deposit: TransactionHeader,
@@ -257,9 +357,13 @@ export class Deposit extends WithdrawalRequest {
       transaction: undefined as unknown as ccc.Transaction,
       header: tip,
     });
-    this.transactionHeaders.pop();
+    this.transactionHeaders.pop(); // Remove the withdrawal request header as it's not applicable for deposits.
   }
 
+  /**
+   * Updates the deposit's interests and maturity based on the latest block header.
+   * @param tip - The client block header representing the latest block.
+   */
   update(tip: ccc.ClientBlockHeader): void {
     const depositHeader = this.transactionHeaders[0].header;
     this.interests = getInterests(this.cell, depositHeader, tip);
@@ -267,8 +371,27 @@ export class Deposit extends WithdrawalRequest {
   }
 }
 
-// Credits to Hanssen from CKB DevRel:
-// https://github.com/ckb-devrel/ccc/blob/master/packages/demo/src/app/connected/(tools)/NervosDao/page.tsx
+/**
+ * Class representing a withdrawal request in NervosDAO.
+ * Inherits from DaoCell and represents a specific type of NervosDAO cell for withdrawal requests.
+ */
+export class WithdrawalRequest extends DaoCell {}
+
+/**
+ * Calculates the interests earned on a given cell based on the deposit and withdraw headers.
+ *
+ * @param cell - The cell for which interests are being calculated.
+ * @param depositHeader - The block header at the time of deposit.
+ * @param withdrawHeader - The block header at the time of withdrawal.
+ * @returns The calculated interests as a `ccc.Num`.
+ *
+ * @credits Hanssen from CKB DevRel:
+ * https://github.com/ckb-devrel/ccc/blob/master/packages/demo/src/app/connected/(tools)/NervosDao/page.tsx
+ *
+ * @example
+ * // Example usage:
+ * const interests = getInterests(cell, depositHeader, withdrawHeader);
+ */
 function getInterests(
   cell: ccc.Cell,
   depositHeader: ccc.ClientBlockHeader,
@@ -285,8 +408,20 @@ function getInterests(
   );
 }
 
-// Credits to Hanssen from CKB DevRel:
-// https://github.com/ckb-devrel/ccc/blob/master/packages/demo/src/app/connected/(tools)/NervosDao/page.tsx
+/**
+ * Calculates the maturity epoch for a deposit based on the deposit and withdraw headers.
+ *
+ * @param depositHeader - The block header at the time of deposit.
+ * @param withdrawHeader - The block header at the time of withdrawal.
+ * @returns The calculated maturity epoch as a `ccc.Epoch`.
+ *
+ * @credits Hanssen from CKB DevRel:
+ * https://github.com/ckb-devrel/ccc/blob/master/packages/demo/src/app/connected/(tools)/NervosDao/page.tsx
+ *
+ * @example
+ * // Example usage:
+ * const maturity = getMaturity(depositHeader, withdrawHeader);
+ */
 function getMaturity(
   depositHeader: ccc.ClientBlockHeader,
   withdrawHeader: ccc.ClientBlockHeader,

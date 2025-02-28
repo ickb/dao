@@ -1,10 +1,22 @@
 import { ccc } from "@ckb-ccc/core";
 
+/**
+ * Represents the header of a transaction, containing the transaction details
+ * and the associated block header.
+ */
 export interface TransactionHeader {
-  transaction: ccc.Transaction;
-  header: ccc.ClientBlockHeader;
+  transaction: ccc.Transaction; // The transaction details.
+  header: ccc.ClientBlockHeader; // The block header associated with the transaction.
 }
 
+/**
+ * Retrieves the transaction header for a given transaction hash.
+ *
+ * @param client - The client used to interact with the blockchain.
+ * @param transactionHash - The hash of the transaction to retrieve.
+ * @returns A promise that resolves to a TransactionHeader object.
+ * @throws Error if the transaction or header is not found.
+ */
 export async function getTransactionHeader(
   client: ccc.Client,
   transactionHash: ccc.Hex,
@@ -24,6 +36,14 @@ export async function getTransactionHeader(
   return { transaction: transaction.transaction, header };
 }
 
+/**
+ * Partitions an array of items into two groups based on a reference epoch.
+ *
+ * @param tt - The array of items to partition.
+ * @param get - A function that retrieves the epoch from an item.
+ * @param reference - The reference epoch to compare against.
+ * @returns An object containing two arrays: `before` and `after`.
+ */
 export function epochPartition<T>(
   tt: readonly T[],
   get: (t: T) => ccc.Epoch,
@@ -41,6 +61,13 @@ export function epochPartition<T>(
   return { after, before };
 }
 
+/**
+ * Compares two epochs and returns an integer indicating their order.
+ *
+ * @param a - The first epoch to compare.
+ * @param b - The second epoch to compare.
+ * @returns 1 if a > b, -1 if a < b, and 0 if they are equal.
+ */
 export function epochCompare(a: ccc.Epoch, b: ccc.Epoch): 1 | 0 | -1 {
   const [aNumber, aIndex, aLength] = a;
   const [bNumber, bIndex, bLength] = b;
@@ -64,6 +91,14 @@ export function epochCompare(a: ccc.Epoch, b: ccc.Epoch): 1 | 0 | -1 {
   return 0;
 }
 
+/**
+ * Adds to an epoch a duration expressed in another epoch and returns the resulting epoch.
+ *
+ * @param epoch - The base epoch to which the delta will be added.
+ * @param delta - The duration to add to the base epoch.
+ * @returns The resulting epoch after addition.
+ * @throws Error if either epoch has a length of zero.
+ */
 export function epochAdd(epoch: ccc.Epoch, delta: ccc.Epoch): ccc.Epoch {
   const [eNumber, eIndex, eLength] = epoch;
   const [dNumber, dIndex, dLength] = delta;
@@ -86,9 +121,14 @@ export function epochAdd(epoch: ccc.Epoch, delta: ccc.Epoch): ccc.Epoch {
   return [number, index, length];
 }
 
-// Durstenfeld shuffle, see https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
-export function shuffle<T>(a: readonly T[]) {
-  const array = [...a];
+/**
+ * Shuffles in-place an array using the Durstenfeld shuffle algorithm.
+ * @link https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle
+ *
+ * @param array - The array to shuffle.
+ * @returns The same array containing the shuffled elements.
+ */
+export function shuffle<T>(array: T[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
@@ -96,15 +136,28 @@ export function shuffle<T>(a: readonly T[]) {
   return array;
 }
 
-// BinarySearch is translated from https://go.dev/src/sort/search.go, credits to the respective authors.
-
-// BinarySearch uses binary search to find and return the smallest index i
-// in [0, n) at which f(i) is true, assuming that on the range [0, n),
-// f(i) == true implies f(i+1) == true. That is, Search requires that
-// f is false for some (possibly empty) prefix of the input range [0, n)
-// and then true for the (possibly empty) remainder; Search returns
-// the first true index. If there is no such index, Search returns n.
-// Search calls f(i) only for i in the range [0, n).
+/**
+ * Performs a binary search to find the smallest index `i` in the range [0, n)
+ * such that the function `f(i)` returns true. It is assumed that for the range
+ * [0, n), if `f(i)` is true, then `f(i+1)` is also true. This means that there
+ * is a prefix of the input range where `f` is false, followed by a suffix where
+ * `f` is true. If no such index exists, the function returns `n`.
+ *
+ * The function `f` is only called for indices in the range [0, n).
+ *
+ * @param n - The upper bound of the search range (exclusive).
+ * @param f - A function that takes an index `i` and returns a boolean value.
+ * @returns The smallest index `i` such that `f(i)` is true, or `n` if no such index exists.
+ *
+ * @credits go standard library authors, this implementation is just a translation or that code:
+ * https://go.dev/src/sort/search.go
+ *
+ * @example
+ * // Example usage:
+ * const isGreaterThanFive = (i: number) => i > 5;
+ * const index = binarySearch(10, isGreaterThanFive); // Returns 6
+ *
+ */
 export function binarySearch(n: number, f: (i: number) => boolean): number {
   // Define f(-1) == false and f(n) == true.
   // Invariant: f(i-1) == false, f(j) == true.
@@ -122,10 +175,30 @@ export function binarySearch(n: number, f: (i: number) => boolean): number {
   return i;
 }
 
+/**
+ * Returns the maximum value from a list of numbers.
+ *
+ * @param numbers - A variable number of values to compare.
+ * @returns The maximum value among the provided numbers.
+ *
+ * @example
+ * // Example usage:
+ * const maximum = max(1, 5, 3, 9, 2); // Returns 9
+ */
 export function max<T>(...numbers: T[]) {
   return numbers.reduce((a, b) => (a > b ? a : b));
 }
 
+/**
+ * Returns the minimum value from a list of numbers.
+ *
+ * @param numbers - A variable number of values to compare.
+ * @returns The minimum value among the provided numbers.
+ *
+ * @example
+ * // Example usage:
+ * const minimum = min(1, 5, 3, 9, 2); // Returns 1
+ */
 export function min<T>(...numbers: T[]) {
   return numbers.reduce((a, b) => (a < b ? a : b));
 }
