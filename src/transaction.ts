@@ -224,26 +224,29 @@ export class SmartTransaction extends ccc.Transaction {
   }
 
   /**
-   * Adds transaction headers to both headerDeps and transactionHeaders,
-   * substituting in-place if already present.
+   * Adds transaction headers to both headerDeps and transactionHeaders if not already present.
    * @param transactionHeaders - One or more transaction headers to add.
    */
   addTransactionHeaders(
     ...transactionHeaders: (TransactionHeader | TransactionHeader[])[]
   ): void {
     transactionHeaders.flat().forEach((transactionHeader) => {
+      const txhash = transactionHeader.transaction.hash();
       const headerDep = transactionHeader.header.hash;
-      const headerDepIndex = this.headerDeps.findIndex((h) => h === headerDep);
-      if (headerDepIndex === -1) {
-        this.headerDeps.push(headerDep);
-      } /*else { // Commented out as it doesn't change anything
-        this.headerDeps[headerDepIndex] = headerDep;
-      }*/
 
-      this.transactionHeaders.set(
-        transactionHeader.transaction.hash(),
-        transactionHeader,
-      );
+      if (!this.transactionHeaders.has(txhash)) {
+        this.transactionHeaders.set(txhash, transactionHeader);
+      } else if (
+        headerDep !== this.transactionHeaders.get(txhash)?.header.hash
+      ) {
+        throw new Error(
+          "The same transaction cannot have two distinct headers",
+        );
+      }
+
+      if (!this.headerDeps.some((h) => h === headerDep)) {
+        this.headerDeps.push(headerDep);
+      }
     });
   }
 
