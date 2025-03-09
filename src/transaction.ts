@@ -137,19 +137,30 @@ export class SmartTransaction extends ccc.Transaction {
    * @returns A promise that resolves to the total capacity of inputs.
    */
   override async getInputsCapacity(client: ccc.Client): Promise<ccc.Num> {
-    const dao = await Dao.newFrom(client);
+    const { hashType, codeHash } = await client.getKnownScript(
+      ccc.KnownScript.NervosDao,
+    );
+    const dao = new Dao(
+      ccc.Script.from({ codeHash, hashType, args: "0x" }),
+      [],
+    );
+
     return ccc.reduceAsync(
       this.inputs,
       async (total, input) => {
         // Get all cell info
         await input.completeExtraInfos(client);
-        const { previousOutput, cellOutput, outputData } = input;
+        const { previousOutput: outPoint, cellOutput, outputData } = input;
 
         // Input is not well defined
         if (!cellOutput || !outputData) {
           throw new Error("Unable to complete input");
         }
-        const cell = ccc.Cell.from({ previousOutput, cellOutput, outputData });
+        const cell = ccc.Cell.from({
+          outPoint,
+          cellOutput,
+          outputData,
+        });
 
         total += cellOutput.capacity;
 
@@ -161,13 +172,14 @@ export class SmartTransaction extends ccc.Transaction {
         // Get header of NervosDAO cell and check its inclusion in HeaderDeps
         const transactionHeader = await this.getTransactionHeader(
           client,
-          previousOutput.txHash,
+          outPoint.txHash,
         );
 
         // It's a withdrawal request cell, get header of previous deposit cell
         const depositTransactionHeader = await this.getTransactionHeader(
           client,
-          transactionHeader.transaction.inputs[Number(previousOutput.index)]
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          transactionHeader.transaction.inputs[Number(outPoint.index)]!
             .previousOutput.txHash,
         );
 

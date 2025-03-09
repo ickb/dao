@@ -22,23 +22,6 @@ export class Dao {
   ) {}
 
   /**
-   * Creates a new instance of the Dao class from a client.
-   *
-   * @param client - The client used to interact with the blockchain.
-   * @returns A promise that resolves to a new Dao instance.
-   */
-  static async newFrom(client: ccc.Client): Promise<Dao> {
-    const { hashType, codeHash, cellDeps } = await client.getKnownScript(
-      ccc.KnownScript.NervosDao,
-    );
-    const script = ccc.Script.from({ codeHash, hashType, args: "0x" });
-    return new Dao(
-      script,
-      cellDeps.map((d) => d.cellDep),
-    );
-  }
-
-  /**
    * Checks if a given cell is a deposit.
    *
    * @param cell - The cell to check.
@@ -141,6 +124,11 @@ export class Dao {
         );
       }
 
+      const depositTransactionHeader = transactionHeaders[0];
+      if (!depositTransactionHeader) {
+        throw Error("Deposit TransactionHeader not found in Deposit");
+      }
+
       tx.addTransactionHeaders(transactionHeaders);
       tx.addInput(cell);
       tx.addOutput(
@@ -149,7 +137,7 @@ export class Dao {
           lock: l,
           type: this.script,
         },
-        ccc.numLeToBytes(transactionHeaders[0].header.number, 8),
+        ccc.numLeToBytes(depositTransactionHeader.header.number, 8),
       );
     }
 
@@ -173,8 +161,13 @@ export class Dao {
         maturity,
       } = withdrawalRequest;
       tx.addTransactionHeaders(transactionHeaders);
+
+      const depositTransactionHeader = transactionHeaders[0];
+      if (!depositTransactionHeader) {
+        throw Error("Deposit TransactionHeader not found in WithdrawalRequest");
+      }
       const headerIndex = tx.headerDeps.findIndex(
-        (h) => h === transactionHeaders[0].header.hash,
+        (h) => h === depositTransactionHeader.header.hash,
       );
 
       const inputIndex =
@@ -276,7 +269,8 @@ export class Dao {
 
       const depositTransactionHeader = await getTransactionHeader(
         client,
-        transactionHeader.transaction.inputs[Number(cell.outPoint.index)]
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        transactionHeader.transaction.inputs[Number(cell.outPoint.index)]!
           .previousOutput.txHash,
       );
 
@@ -365,7 +359,12 @@ export class Deposit extends DaoCell {
    * @param tip - The client block header representing the latest block.
    */
   update(tip: ccc.ClientBlockHeader): void {
-    const depositHeader = this.transactionHeaders[0].header;
+    const depositTransactionHeader = this.transactionHeaders[0];
+    if (!depositTransactionHeader) {
+      throw Error("Deposit TransactionHeader not found");
+    }
+
+    const depositHeader = depositTransactionHeader.header;
     this.interests = getInterests(this.cell, depositHeader, tip);
     this.maturity = getMaturity(depositHeader, tip);
   }
