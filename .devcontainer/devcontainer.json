@@ -36,7 +36,8 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "yoavbls.pretty-ts-errors",
-        "davidanson.vscode-markdownlint"
+        "davidanson.vscode-markdownlint",
+        "github.vscode-github-actions"
       ]
     }
   }
