@@ -151,7 +151,10 @@ export class Dao {
    * @param withdrawalRequests - An array of withdrawal requests to process.
    * @returns void.
    */
-  withdraw(tx: SmartTransaction, withdrawalRequests: WithdrawalRequest[]) {
+  withdraw(
+    tx: SmartTransaction,
+    withdrawalRequests: WithdrawalRequest[],
+  ): void {
     tx.addCellDeps(this.cellDep);
 
     for (const withdrawalRequest of withdrawalRequests) {

@@ -48,7 +48,10 @@ export function epochPartition<T>(
   tt: readonly T[],
   get: (t: T) => ccc.Epoch,
   reference: ccc.Epoch,
-) {
+): {
+  after: T[];
+  before: T[];
+} {
   const before: T[] = [];
   const after: T[] = [];
   for (const t of tt) {
@@ -128,7 +131,7 @@ export function epochAdd(epoch: ccc.Epoch, delta: ccc.Epoch): ccc.Epoch {
  * @param array - The array to shuffle.
  * @returns The same array containing the shuffled elements.
  */
-export function shuffle<T>(array: T[]) {
+export function shuffle<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -186,7 +189,7 @@ export function binarySearch(n: number, f: (i: number) => boolean): number {
  * // Example usage:
  * const maximum = max(1, 5, 3, 9, 2); // Returns 9
  */
-export function max<T>(...numbers: T[]) {
+export function max<T>(...numbers: T[]): T {
   return numbers.reduce((a, b) => (a > b ? a : b));
 }
 
@@ -200,6 +203,6 @@ export function max<T>(...numbers: T[]) {
  * // Example usage:
  * const minimum = min(1, 5, 3, 9, 2); // Returns 1
  */
-export function min<T>(...numbers: T[]) {
+export function min<T>(...numbers: T[]): T {
   return numbers.reduce((a, b) => (a < b ? a : b));
 }
