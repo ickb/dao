@@ -14,11 +14,11 @@ export class Dao {
    * Creates an instance of the Dao class.
    *
    * @param script - The script associated with the NervosDAO.
-   * @param cellDep - An array of cell dependencies for the NervosDAO.
+   * @param cellDeps - An array of cell dependencies for the NervosDAO.
    */
   constructor(
     public script: ccc.Script,
-    public cellDep: ccc.CellDep[],
+    public cellDeps: ccc.CellDep[],
   ) {}
 
   /**
@@ -73,7 +73,7 @@ export class Dao {
     capacities: ccc.Num[],
     lock: ccc.ScriptLike,
   ): void {
-    tx.addCellDeps(this.cellDep);
+    tx.addCellDeps(this.cellDeps);
 
     const l = ccc.Script.from(lock);
     for (const capacity of capacities) {
@@ -113,7 +113,7 @@ export class Dao {
       throw new Error("Transaction have different inputs and outputs lengths");
     }
 
-    tx.addCellDeps(this.cellDep);
+    tx.addCellDeps(this.cellDeps);
 
     const l = ccc.Script.from(lock);
     for (const deposit of deposits) {
@@ -155,7 +155,7 @@ export class Dao {
     tx: SmartTransaction,
     withdrawalRequests: WithdrawalRequest[],
   ): void {
-    tx.addCellDeps(this.cellDep);
+    tx.addCellDeps(this.cellDeps);
 
     for (const withdrawalRequest of withdrawalRequests) {
       const {

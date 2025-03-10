@@ -7,7 +7,10 @@ import { Dao, WithdrawalRequest } from "./dao.js";
  */
 export interface UdtHandler {
   /** The script associated with the UDT. */
-  udt: ccc.Script;
+  script: ccc.Script;
+
+  /** The cellDeps associated with the UDT. */
+  cellDeps: ccc.CellDep[];
 
   /**
    * Asynchronously retrieves the balance of UDT inputs for a given transaction.
@@ -84,12 +87,12 @@ export class SmartTransaction extends ccc.Transaction {
     const signer = args[0];
 
     // Add change cells for all defined UDTs
-    for (const { udt } of this.udtHandlers.values()) {
+    for (const { script: udt } of this.udtHandlers.values()) {
       await this.completeInputsByUdt(signer, udt);
     }
 
     // Double check that all UDTs are even out
-    for (const { udt } of this.udtHandlers.values()) {
+    for (const { script: udt } of this.udtHandlers.values()) {
       const addedCount = await this.completeInputsByUdt(signer, udt);
       if (addedCount > 0) {
         throw new Error("UDT Handlers did not produce a balanced Transaction");
@@ -229,7 +232,7 @@ export class SmartTransaction extends ccc.Transaction {
   addUdtHandlers(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
     udtHandlers.flat().forEach((udtHandler) => {
       this.udtHandlers.set(
-        SmartTransaction.getUdtKey(udtHandler.udt),
+        SmartTransaction.getUdtKey(udtHandler.script),
         udtHandler,
       );
     });
