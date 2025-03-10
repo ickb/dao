@@ -1,4 +1,4 @@
-name: Publish to NPM
+name: Publish to NPM if not already present
 
 on:
   push:
@@ -36,6 +36,14 @@ jobs:
         run: pnpm build
 
       - name: Publish to NPM if not already present
-        run: pnpm publish --provenance --access public
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if pnpm info ${PACKAGE_NAME}@${PACKAGE_VERSION} > /dev/null 2>&1; then
+            echo "Version ${PACKAGE_VERSION} of ${PACKAGE_NAME} is already published, nothing to do."
+          else
+            pnpm publish --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
