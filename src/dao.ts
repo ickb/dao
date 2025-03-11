@@ -200,18 +200,24 @@ export class Dao {
    *
    * @param client - The client used to interact with the blockchain.
    * @param lock - The lock script to filter deposits.
-   * @param tip - An optional tip block header to use as a reference.
+   * @param options - Optional parameters for the search.
+   * @param options.tip - An optional tip block header to use as a reference.
+   * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
    * @returns An async generator that yields Deposit objects.
    */
   async *findDeposits(
     client: ccc.Client,
     lock: ccc.ScriptLike,
-    tip?: ccc.ClientBlockHeaderLike,
+    options?: {
+      tip?: ccc.ClientBlockHeaderLike;
+      onChain?: boolean;
+    },
   ): AsyncGenerator<Deposit> {
-    const tipHeader = tip
-      ? ccc.ClientBlockHeader.from(tip)
+    const tipHeader = options?.tip
+      ? ccc.ClientBlockHeader.from(options.tip)
       : await client.getTipHeader();
-    for await (const cell of client.findCellsOnChain(
+
+    const findCellsArgs = [
       {
         script: lock,
         scriptType: "lock",
@@ -225,7 +231,11 @@ export class Dao {
       },
       "asc",
       400, // https://github.com/nervosnetwork/ckb/pull/4576
-    )) {
+    ] as const;
+
+    for await (const cell of options?.onChain
+      ? client.findCellsOnChain(...findCellsArgs)
+      : client.findCells(...findCellsArgs)) {
       if (!this.isDeposit(cell) || !cell.cellOutput.lock.eq(lock)) {
         continue;
       }
@@ -242,13 +252,18 @@ export class Dao {
    *
    * @param client - The client used to interact with the blockchain.
    * @param lock - The lock script to filter withdrawal requests.
+   * @param options - Optional parameters for the search.
+   * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
    * @returns An async generator that yields WithdrawalRequest objects.
    */
   async *findWithdrawalRequests(
     client: ccc.Client,
     lock: ccc.ScriptLike,
+    options?: {
+      onChain?: boolean;
+    },
   ): AsyncGenerator<WithdrawalRequest> {
-    for await (const cell of client.findCellsOnChain(
+    const findCellsArgs = [
       {
         script: lock,
         scriptType: "lock",
@@ -260,7 +275,11 @@ export class Dao {
       },
       "asc",
       400, // https://github.com/nervosnetwork/ckb/pull/4576
-    )) {
+    ] as const;
+
+    for await (const cell of options?.onChain
+      ? client.findCellsOnChain(...findCellsArgs)
+      : client.findCells(...findCellsArgs)) {
       if (!this.isWithdrawalRequest(cell) || !cell.cellOutput.lock.eq(lock)) {
         continue;
       }
