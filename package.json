@@ -1,6 +1,6 @@
 {
   "name": "@ickb/dao",
-  "version": "1000.0.1",
+  "version": "1000.0.2",
   "description": "NervosDAO utilities built on top of CCC",
   "author": "phroi",
   "license": "MIT",
