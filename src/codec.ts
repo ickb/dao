@@ -1,6 +1,13 @@
 import { mol, ccc } from "@ckb-ccc/core";
 
 /**
+ * Codec for encoding and decoding UDT amounts.
+ */
+export const UdtData = mol.struct({
+  udtAmount: mol.Uint128,
+});
+
+/**
  * Codec for encoding and decoding 8-bit signed integers.
  */
 export const Int8 = mol.Codec.from<ccc.NumLike, number>({
