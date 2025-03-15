@@ -2,6 +2,7 @@ import { ccc } from "@ckb-ccc/core";
 import type { SmartTransaction } from "./transaction.js";
 import {
   epochCompare,
+  getCkbUnoccupied,
   getTransactionHeader,
   type TransactionHeader,
 } from "./utils.js";
@@ -418,10 +419,7 @@ function getInterests(
   depositHeader: ccc.ClientBlockHeader,
   withdrawHeader: ccc.ClientBlockHeader,
 ): ccc.Num {
-  const occupiedSize = ccc.fixedPointFrom(
-    cell.cellOutput.occupiedSize + ccc.bytesFrom(cell.outputData).length,
-  );
-  const profitableSize = cell.cellOutput.capacity - occupiedSize;
+  const profitableSize = getCkbUnoccupied(cell);
 
   return (
     (profitableSize * withdrawHeader.dao.ar) / depositHeader.dao.ar -
