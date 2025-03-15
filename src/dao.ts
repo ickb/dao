@@ -70,7 +70,7 @@ export class Dao {
    */
   deposit(
     tx: SmartTransaction,
-    capacities: ccc.Num[],
+    capacities: ccc.FixedPoint[],
     lock: ccc.ScriptLike,
   ): void {
     tx.addCellDeps(this.cellDeps);
