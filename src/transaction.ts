@@ -235,6 +235,7 @@ export class SmartTransaction extends ccc.Transaction {
         SmartTransaction.getUdtKey(udtHandler.script),
         udtHandler,
       );
+      this.addCellDeps(udtHandler.cellDeps);
     });
   }
 
