@@ -249,13 +249,12 @@ export class SmartTransaction extends ccc.Transaction {
    * Adds one or more transaction headers to headers, indexed by their hash, number, and optional transaction hash.
    *
    * This method accepts either a single `TransactionHeader` or an array of `TransactionHeader` objects.
-   * It ensures that each header is uniquely stored by its hash and number, and it checks for conflicts
-   * if a header with the same number or transaction hash already exists.
+   * It encodes the header's hash, number, and optional transaction hash into keys and ensures that each header
+   * is uniquely stored. If a header with the same hash already exists, it retains the old header.
    *
    * @param headers - One or more transaction headers to be added. This can be a single `TransactionHeader`
    *   or an array of `TransactionHeader` objects.
-   * @throws Error if the same header number has two different hashes.
-   * @throws Error if the same transaction hash has two different headers.
+   * @throws Error if two different hashes are found for the same header.
    */
   addHeaders(...headers: (TransactionHeader | TransactionHeader[])[]): void {
     headers.flat().forEach(({ header, txHash }) => {
