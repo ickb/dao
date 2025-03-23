@@ -1,38 +1,6 @@
 import { ccc } from "@ckb-ccc/core";
 
 /**
- * Calculates the occupied capacity of a given cell.
- *
- * @param cell - An object representing the cell for which the occupied size is calculated.
- * @param cell.cellOutput - The output of the cell.
- * @param cell.outputData - The data associated with the cell, represented in hexadecimal format.
- * @returns The occupied size of the cell in CKB as a `ccc.FixedPoint`.
- */
-export function getCkbOccupied(cell: {
-  cellOutput: ccc.CellOutput;
-  outputData: ccc.Hex;
-}): ccc.FixedPoint {
-  return ccc.fixedPointFrom(
-    cell.cellOutput.occupiedSize + ccc.bytesFrom(cell.outputData).length,
-  );
-}
-
-/**
- * Calculates the unoccupied capacity of a given cell.
- *
- * @param cell - An object representing the cell for which the unoccupied size is calculated.
- * @param cell.cellOutput - The output of the cell.
- * @param cell.outputData - The data associated with the cell, represented in hexadecimal format.
- * @returns The unoccupied size of the cell in CKB as a `ccc.FixedPoint`.
- */
-export function getCkbUnoccupied(cell: {
-  cellOutput: ccc.CellOutput;
-  outputData: ccc.Hex;
-}): ccc.FixedPoint {
-  return cell.cellOutput.capacity - getCkbOccupied(cell);
-}
-
-/**
  * Represents the header of a transaction, containing the transaction details
  * and the associated block header.
  */

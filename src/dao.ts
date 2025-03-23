@@ -2,7 +2,6 @@ import { ccc } from "@ckb-ccc/core";
 import type { SmartTransaction } from "./transaction.js";
 import {
   epochCompare,
-  getCkbUnoccupied,
   getTransactionHeader,
   type TransactionHeader,
 } from "./utils.js";
@@ -336,12 +335,15 @@ export abstract class DaoCell {
   ) {
     this.cell = cell;
     this.transactionHeaders = [deposit, withdrawalRequest];
-    this.interests = getInterests(
-      this.cell,
+    this.interests = ccc.calcDaoProfit(
+      cell.capacityFree,
       deposit.header,
       withdrawalRequest.header,
     );
-    this.maturity = getMaturity(deposit.header, withdrawalRequest.header);
+    this.maturity = ccc.calcDaoClaimEpoch(
+      deposit.header,
+      withdrawalRequest.header,
+    );
   }
 
   /**
@@ -388,8 +390,12 @@ export class Deposit extends DaoCell {
     }
 
     const depositHeader = depositTransactionHeader.header;
-    this.interests = getInterests(this.cell, depositHeader, tip);
-    this.maturity = getMaturity(depositHeader, tip);
+    this.interests = ccc.calcDaoProfit(
+      this.cell.capacityFree,
+      depositHeader,
+      tip,
+    );
+    this.maturity = ccc.calcDaoClaimEpoch(depositHeader, tip);
   }
 }
 
@@ -398,74 +404,3 @@ export class Deposit extends DaoCell {
  * Inherits from DaoCell and represents a specific type of NervosDAO cell for withdrawal requests.
  */
 export class WithdrawalRequest extends DaoCell {}
-
-/**
- * Calculates the interests earned on a given cell based on the deposit and withdraw headers.
- *
- * @param cell - The cell for which interests are being calculated.
- * @param depositHeader - The block header at the time of deposit.
- * @param withdrawHeader - The block header at the time of withdrawal.
- * @returns The calculated interests as a `ccc.Num`.
- *
- * @credits Hanssen from CKB DevRel:
- * https://github.com/ckb-devrel/ccc/blob/master/packages/demo/src/app/connected/(tools)/NervosDao/page.tsx
- *
- * @example
- * // Example usage:
- * const interests = getInterests(cell, depositHeader, withdrawHeader);
- */
-function getInterests(
-  cell: ccc.Cell,
-  depositHeader: ccc.ClientBlockHeader,
-  withdrawHeader: ccc.ClientBlockHeader,
-): ccc.Num {
-  const profitableSize = getCkbUnoccupied(cell);
-
-  return (
-    (profitableSize * withdrawHeader.dao.ar) / depositHeader.dao.ar -
-    profitableSize
-  );
-}
-
-/**
- * Calculates the maturity epoch for a deposit based on the deposit and withdraw headers.
- *
- * @param depositHeader - The block header at the time of deposit.
- * @param withdrawHeader - The block header at the time of withdrawal.
- * @returns The calculated maturity epoch as a `ccc.Epoch`.
- *
- * @credits Hanssen from CKB DevRel:
- * https://github.com/ckb-devrel/ccc/blob/master/packages/demo/src/app/connected/(tools)/NervosDao/page.tsx
- *
- * @example
- * // Example usage:
- * const maturity = getMaturity(depositHeader, withdrawHeader);
- */
-function getMaturity(
-  depositHeader: ccc.ClientBlockHeader,
-  withdrawHeader: ccc.ClientBlockHeader,
-): ccc.Epoch {
-  const depositEpoch = depositHeader.epoch;
-  const withdrawEpoch = withdrawHeader.epoch;
-  const intDiff = withdrawEpoch[0] - depositEpoch[0];
-  // deposit[1]    withdraw[1]
-  // ---------- <= -----------
-  // deposit[2]    withdraw[2]
-  if (
-    intDiff % ccc.numFrom(180) !== ccc.numFrom(0) ||
-    depositEpoch[1] * withdrawEpoch[2] <= depositEpoch[2] * withdrawEpoch[1]
-  ) {
-    return [
-      depositEpoch[0] +
-        (intDiff / ccc.numFrom(180) + ccc.numFrom(1)) * ccc.numFrom(180),
-      depositEpoch[1],
-      depositEpoch[2],
-    ];
-  }
-
-  return [
-    depositEpoch[0] + (intDiff / ccc.numFrom(180)) * ccc.numFrom(180),
-    depositEpoch[1],
-    depositEpoch[2],
-  ];
-}
