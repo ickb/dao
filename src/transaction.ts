@@ -1,6 +1,6 @@
 import { ccc } from "@ckb-ccc/core";
-import { getTransactionHeader, type TransactionHeader } from "./utils.js";
-import { Dao, WithdrawalRequest } from "./dao.js";
+import { Dao } from "./dao.js";
+import { getHeader, type HeaderKey } from "./utils.js";
 
 /**
  * Interface representing a handler for User Defined Tokens (UDTs).
@@ -37,8 +37,8 @@ export interface UdtHandler {
  * for handling UDTs and ensuring balanced transactions.
  *
  * Notes:
- * - udtHandlers and transactionHeaders are always shared among descendants.
- * - transactionHeaders may not contain all headers referenced by headerDeps.
+ * - udtHandlers and headers are always shared among descendants.
+ * - headers may not contain all headers referenced by headerDeps.
  */
 export class SmartTransaction extends ccc.Transaction {
   /**
@@ -51,7 +51,8 @@ export class SmartTransaction extends ccc.Transaction {
    * @param outputsData - The data associated with the outputs.
    * @param witnesses - The witnesses for the transaction.
    * @param udtHandlers - A map of UDT handlers associated with the transaction.
-   * @param transactionHeaders - A map of transaction headers associated with the transaction.
+   * @param headers - A map of headers associated with the transaction, indexed by
+   *  their hash, number and possibly transaction hash.
    */
   constructor(
     version: ccc.Num,
@@ -62,7 +63,7 @@ export class SmartTransaction extends ccc.Transaction {
     outputsData: ccc.Hex[],
     witnesses: ccc.Hex[],
     public udtHandlers: Map<string, UdtHandler>,
-    public transactionHeaders: Map<ccc.Hex, TransactionHeader>,
+    public headers: Map<string, ccc.ClientBlockHeader>,
   ) {
     super(
       version,
@@ -173,37 +174,32 @@ export class SmartTransaction extends ccc.Transaction {
         }
 
         // Get header of NervosDAO cell and check its inclusion in HeaderDeps
-        const transactionHeader = await this.getTransactionHeader(
-          client,
-          outPoint.txHash,
-        );
+        const withdrawHeader = await this.getHeader(client, {
+          type: "txHash",
+          value: outPoint.txHash,
+        });
 
         // It's a withdrawal request cell, get header of previous deposit cell
-        const depositTransactionHeader = await this.getTransactionHeader(
-          client,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          transactionHeader.transaction.inputs[Number(outPoint.index)]!
-            .previousOutput.txHash,
-        );
+        const depositHeader = await this.getHeader(client, {
+          type: "number",
+          value: outputData,
+        });
 
-        const withdrawalRequest = new WithdrawalRequest(
-          cell,
-          depositTransactionHeader,
-          transactionHeader,
+        return (
+          total +
+          ccc.calcDaoProfit(cell.capacityFree, depositHeader, withdrawHeader)
         );
-
-        return total + withdrawalRequest.interests;
       },
       ccc.numFrom(0),
     );
   }
 
   /**
-   * Generates a unique key for a UDT based on its script.
+   * Gets the unique key for a UDT based on its script.
    * @param udt - The UDT script or script-like object.
    * @returns A string representing the unique key for the UDT in udtHandlers.
    */
-  static getUdtKey(udt: ccc.ScriptLike): string {
+  encodeUdtKey(udt: ccc.ScriptLike): string {
     return ccc.Script.from(udt).toBytes().toString();
   }
 
@@ -213,7 +209,7 @@ export class SmartTransaction extends ccc.Transaction {
    * @returns The UdtHandler associated with the UDT, or undefined if not found.
    */
   getUdtHandler(udt: ccc.ScriptLike): UdtHandler | undefined {
-    return this.udtHandlers.get(SmartTransaction.getUdtKey(udt));
+    return this.udtHandlers.get(this.encodeUdtKey(udt));
   }
 
   /**
@@ -222,7 +218,7 @@ export class SmartTransaction extends ccc.Transaction {
    * @returns A boolean indicating whether a UDT handler exists for the UDT.
    */
   hasUdtHandler(udt: ccc.ScriptLike): boolean {
-    return this.udtHandlers.has(SmartTransaction.getUdtKey(udt));
+    return this.udtHandlers.has(this.encodeUdtKey(udt));
   }
 
   /**
@@ -231,67 +227,117 @@ export class SmartTransaction extends ccc.Transaction {
    */
   addUdtHandlers(...udtHandlers: (UdtHandler | UdtHandler[])[]): void {
     udtHandlers.flat().forEach((udtHandler) => {
-      this.udtHandlers.set(
-        SmartTransaction.getUdtKey(udtHandler.script),
-        udtHandler,
-      );
+      this.udtHandlers.set(this.encodeUdtKey(udtHandler.script), udtHandler);
       this.addCellDeps(udtHandler.cellDeps);
     });
   }
 
   /**
-   * Adds transaction headers to both headerDeps and transactionHeaders if not already present.
-   * @param transactionHeaders - One or more transaction headers to add.
+   * Encode a header key based on the provided `HeaderKey` object.
+   *
+   * @param headerKey - An object of type `HeaderKey` that contains the type and value
+   *   used to generate the header key.
+   * @returns A string representing the generated header key, which is a combination
+   *   of the type and the byte representation of the value.
    */
-  addTransactionHeaders(
-    ...transactionHeaders: (TransactionHeader | TransactionHeader[])[]
-  ): void {
-    transactionHeaders.flat().forEach((transactionHeader) => {
-      const txhash = transactionHeader.transaction.hash();
-      const headerDep = transactionHeader.header.hash;
+  encodeHeaderKey(headerKey: HeaderKey): string {
+    const { type, value } = headerKey;
+    return ccc.bytesFrom(value).toString() + type;
+  }
 
-      if (!this.transactionHeaders.has(txhash)) {
-        this.transactionHeaders.set(txhash, transactionHeader);
-      } else if (
-        headerDep !== this.transactionHeaders.get(txhash)?.header.hash
-      ) {
-        throw new Error(
-          "The same transaction cannot have two distinct headers",
+  /**
+   * Adds one or more transaction headers to headers, indexed by their hash, number, and optional transaction hash.
+   *
+   * This method accepts either a single `TransactionHeader` or an array of `TransactionHeader` objects.
+   * It ensures that each header is uniquely stored by its hash and number, and it checks for conflicts
+   * if a header with the same number or transaction hash already exists.
+   *
+   * @param headers - One or more transaction headers to be added. This can be a single `TransactionHeader`
+   *   or an array of `TransactionHeader` objects.
+   * @throws Error if the same header number has two different hashes.
+   * @throws Error if the same transaction hash has two different headers.
+   */
+  addHeaders(...headers: (TransactionHeader | TransactionHeader[])[]): void {
+    headers.flat().forEach(({ header, txHash }) => {
+      const { hash, number } = header;
+
+      // Encode Hash, Number and possibly TxHash as header keys
+      const keys = [
+        this.encodeHeaderKey({
+          type: "hash",
+          value: hash,
+        }),
+        this.encodeHeaderKey({
+          type: "number",
+          value: ccc.numLeToBytes(number),
+        }),
+      ];
+      if (txHash) {
+        keys.push(
+          this.encodeHeaderKey({
+            type: "txHash",
+            value: txHash,
+          }),
         );
       }
 
-      if (!this.headerDeps.some((h) => h === headerDep)) {
-        this.headerDeps.push(headerDep);
+      // Add Header by Hash, Number and possibly TxHash
+      for (const key of keys) {
+        const h = this.headers.get(key);
+        if (!h) {
+          this.headers.set(key, header);
+        } else if (hash == h.hash) {
+          // Keep old header
+          header = h;
+        } else {
+          throw new Error("Found two hashes for the same header");
+        }
+      }
+
+      // Add Header to HeaderDeps
+      if (!this.headerDeps.some((h) => h === hash)) {
+        this.headerDeps.push(hash);
       }
     });
   }
 
   /**
-   * Retrieves a TransactionHeader when its header hash already exists in headerDeps,
-   * possibly recording it to the transaction's transactionHeaders
-   * @param client - The client instance used to interact with the blockchain.
-   * @param transactionHash - The hash of the transaction for which to retrieve the header.
-   * @returns A promise that resolves to the TransactionHeader associated with the given transaction hash.
-   * @throws An error if the header hash is not found in headerDeps.
+   * Retrieves a block header based on the provided header key, caching the result for future use.
+   *
+   * This method first attempts to retrieve the header from a local cache. If the header is not found,
+   * it fetches the header from the blockchain using the provided client and header key. After fetching,
+   * it adds the header to the cache and verifies its presence in the header dependencies.
+   *
+   * @param client - An instance of `ccc.Client` used to interact with the blockchain.
+   * @param headerKey - An object of type `HeaderKey` that specifies how to retrieve the header.
+   * @returns A promise that resolves to a `ccc.ClientBlockHeader` representing the block header.
+   * @throws Error if the header is not found in the header dependencies.
    */
-  async getTransactionHeader(
+  async getHeader(
     client: ccc.Client,
-    transactionHash: ccc.Hex,
-  ): Promise<TransactionHeader> {
-    let result = this.transactionHeaders.get(transactionHash);
-    if (!result) {
-      result = await getTransactionHeader(client, transactionHash);
-      // Record it in transactionHeaders
-      this.transactionHeaders.set(transactionHash, result);
+    headerKey: HeaderKey,
+  ): Promise<ccc.ClientBlockHeader> {
+    const key = this.encodeHeaderKey(headerKey);
+    let header = this.headers.get(key);
+    if (!header) {
+      header = await getHeader(client, headerKey);
+      const headerDepsLength = this.headerDeps.length;
+      this.addHeaders({
+        header,
+        txHash: headerKey.type === "txHash" ? headerKey.value : undefined,
+      });
+      if (headerDepsLength !== this.headerDeps.length) {
+        throw new Error("Header was not present in HeaderDeps");
+      }
+    } else {
+      // Double check that header is present in HeaderDeps
+      const { hash } = header;
+      if (!this.headerDeps.some((h) => h === hash)) {
+        throw new Error("Header not found in HeaderDeps");
+      }
     }
 
-    // Check that its Header hash already exists in HeaderDeps
-    const headerDep = result.header.hash;
-    if (!this.headerDeps.some((h) => h === headerDep)) {
-      throw new Error("Header not found in HeaderDeps");
-    }
-
-    return result;
+    return header;
   }
 
   /**
@@ -313,13 +359,13 @@ export class SmartTransaction extends ccc.Transaction {
   }
 
   /**
-   * Clones the transaction part and shares udtHandlers and transactionHeaders.
+   * Clones the transaction part and shares udtHandlers and headers.
    * @returns A new instance of SmartTransaction that is a clone of the current instance.
    */
   override clone(): SmartTransaction {
     const result = SmartTransaction.from(super.clone());
     result.udtHandlers = this.udtHandlers;
-    result.transactionHeaders = this.transactionHeaders;
+    result.headers = this.headers;
     return result;
   }
 
@@ -337,7 +383,7 @@ export class SmartTransaction extends ccc.Transaction {
     this.outputsData = tx.outputsData;
     this.witnesses = tx.witnesses;
     this.udtHandlers = tx.udtHandlers;
-    this.transactionHeaders = tx.transactionHeaders;
+    this.headers = tx.headers;
   }
 
   /**
@@ -352,7 +398,7 @@ export class SmartTransaction extends ccc.Transaction {
   }
 
   /**
-   * Creates a SmartTransaction from an input transaction and shares udtHandlers and transactionHeaders.
+   * Creates a SmartTransaction from an input transaction. It shares udtHandlers and headers.
    * @param txLike - The transaction-like object to create the SmartTransaction from.
    * @returns A new instance of SmartTransaction created from the input transaction.
    */
@@ -372,8 +418,7 @@ export class SmartTransaction extends ccc.Transaction {
     } = ccc.Transaction.from(txLike);
 
     const udtHandlers = txLike.udtHandlers ?? new Map<string, UdtHandler>();
-    const transactionHeaders =
-      txLike.transactionHeaders ?? new Map<ccc.Hex, TransactionHeader>();
+    const headers = txLike.headers ?? new Map<string, ccc.ClientBlockHeader>();
 
     return new SmartTransaction(
       version,
@@ -384,17 +429,44 @@ export class SmartTransaction extends ccc.Transaction {
       outputsData,
       witnesses,
       udtHandlers,
-      transactionHeaders,
+      headers,
     );
   }
 }
 
 /**
- * Type representing a transaction-like object that includes optional UDT handlers and transaction headers.
+ * Type representing a transaction-like object that can include additional properties
+ * for smart contract handling.
+ *
+ * This type extends the `ccc.TransactionLike` type and adds optional properties for
+ * user-defined token (UDT) handlers and transaction headers.
  */
 export type SmartTransactionLike = ccc.TransactionLike & {
-  /** Optional map of UDT handlers associated with the transaction. */
+  /**
+   * An optional map of user-defined token (UDT) handlers, where the key is a string
+   * representing the UDT identifier and the value is an instance of `UdtHandler`.
+   */
   udtHandlers?: Map<string, UdtHandler>;
-  /** Optional map of transaction headers associated with the transaction. */
-  transactionHeaders?: Map<ccc.Hex, TransactionHeader>;
+
+  /**
+   * An optional map of transaction headers, where the key is a string representing
+   * the header identifier and the value is an instance of `ccc.ClientBlockHeader`.
+   */
+  headers?: Map<string, ccc.ClientBlockHeader>;
 };
+
+/**
+ * Represents a transaction header that includes a block header and an optional transaction hash.
+ */
+export interface TransactionHeader {
+  /**
+   * The block header associated with the transaction, represented as `ccc.ClientBlockHeader`.
+   */
+  header: ccc.ClientBlockHeader;
+
+  /**
+   * An optional transaction hash associated with the transaction, represented as `ccc.HexLike`.
+   * This property may be undefined if the transaction hash is not applicable.
+   */
+  txHash?: ccc.HexLike;
+}

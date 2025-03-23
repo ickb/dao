@@ -1,10 +1,6 @@
 import { ccc } from "@ckb-ccc/core";
-import type { SmartTransaction } from "./transaction.js";
-import {
-  epochCompare,
-  getTransactionHeader,
-  type TransactionHeader,
-} from "./utils.js";
+import type { SmartTransaction, TransactionHeader } from "./transaction.js";
+import { epochCompare, getHeader } from "./utils.js";
 
 /**
  * Represents NervosDAO functionalities.
@@ -129,7 +125,7 @@ export class Dao {
         throw Error("Deposit TransactionHeader not found in Deposit");
       }
 
-      tx.addTransactionHeaders(transactionHeaders);
+      tx.addHeaders(transactionHeaders);
       tx.addInput(cell);
       tx.addOutput(
         {
@@ -163,7 +159,7 @@ export class Dao {
         transactionHeaders,
         maturity,
       } = withdrawalRequest;
-      tx.addTransactionHeaders(transactionHeaders);
+      tx.addHeaders(transactionHeaders);
 
       const depositTransactionHeader = transactionHeaders[0];
       if (!depositTransactionHeader) {
@@ -239,11 +235,14 @@ export class Dao {
       if (!this.isDeposit(cell) || !cell.cellOutput.lock.eq(lock)) {
         continue;
       }
-      const transactionHeader = await getTransactionHeader(
-        client,
-        cell.outPoint.txHash,
-      );
-      yield new Deposit(cell, transactionHeader, tipHeader);
+
+      const txHash = cell.outPoint.txHash;
+      const header = await getHeader(client, {
+        type: "txHash",
+        value: txHash,
+      });
+
+      yield new Deposit(cell, { header, txHash }, tipHeader);
     }
   }
 
@@ -284,22 +283,21 @@ export class Dao {
         continue;
       }
 
-      const transactionHeader = await getTransactionHeader(
-        client,
-        cell.outPoint.txHash,
-      );
+      const txHash = cell.outPoint.txHash;
+      const header = await getHeader(client, {
+        type: "txHash",
+        value: txHash,
+      });
 
-      const depositTransactionHeader = await getTransactionHeader(
-        client,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        transactionHeader.transaction.inputs[Number(cell.outPoint.index)]!
-          .previousOutput.txHash,
-      );
+      const depositHeader = await getHeader(client, {
+        type: "number",
+        value: cell.outputData,
+      });
 
       yield new WithdrawalRequest(
         cell,
-        depositTransactionHeader,
-        transactionHeader,
+        { header: depositHeader },
+        { header, txHash },
       );
     }
   }
@@ -336,7 +334,7 @@ export abstract class DaoCell {
     this.cell = cell;
     this.transactionHeaders = [deposit, withdrawalRequest];
     this.interests = ccc.calcDaoProfit(
-      cell.capacityFree,
+      this.cell.capacityFree,
       deposit.header,
       withdrawalRequest.header,
     );
@@ -373,7 +371,6 @@ export class Deposit extends DaoCell {
     tip: ccc.ClientBlockHeader,
   ) {
     super(cell, deposit, {
-      transaction: undefined as unknown as ccc.Transaction,
       header: tip,
     });
     this.transactionHeaders.pop(); // Remove the withdrawal request header as it's not applicable for deposits.
@@ -384,12 +381,11 @@ export class Deposit extends DaoCell {
    * @param tip - The client block header representing the latest block.
    */
   update(tip: ccc.ClientBlockHeader): void {
-    const depositTransactionHeader = this.transactionHeaders[0];
-    if (!depositTransactionHeader) {
+    const depositHeader = this.transactionHeaders[0]?.header;
+    if (!depositHeader) {
       throw Error("Deposit TransactionHeader not found");
     }
 
-    const depositHeader = depositTransactionHeader.header;
     this.interests = ccc.calcDaoProfit(
       this.cell.capacityFree,
       depositHeader,

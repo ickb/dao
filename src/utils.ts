@@ -1,39 +1,51 @@
 import { ccc } from "@ckb-ccc/core";
 
 /**
- * Represents the header of a transaction, containing the transaction details
- * and the associated block header.
+ * Represents a key for retrieving a block header.
  */
-export interface TransactionHeader {
-  transaction: ccc.Transaction; // The transaction details.
-  header: ccc.ClientBlockHeader; // The block header associated with the transaction.
+export interface HeaderKey {
+  /**
+   * The type of the header key. It can be one of the following:
+   * - "hash": Indicates that the header key is a hash type.
+   * - "number": Indicates that the header key is a number type.
+   * - "txHash": Indicates that the header key is a transaction hash type.
+   */
+  type: "hash" | "number" | "txHash";
+
+  /**
+   * The Little-endian encoded value associated with the header key, represented as `ccc.HexLike`.
+   */
+  value: ccc.HexLike;
 }
 
 /**
- * Retrieves the transaction header for a given transaction hash.
+ * Retrieves the block header based on the provided header key.
  *
- * @param client - The client used to interact with the blockchain.
- * @param transactionHash - The hash of the transaction to retrieve.
- * @returns A promise that resolves to a TransactionHeader object.
- * @throws Error if the transaction or header is not found.
+ * @param client - An instance of `ccc.Client` used to interact with the blockchain.
+ * @param headerKey - An object of type `HeaderKey` that specifies how to retrieve the header.
+ * @returns A promise that resolves to a `ccc.ClientBlockHeader` representing the block header.
+ * @throws Error if the header is not found for the given header key.
  */
-export async function getTransactionHeader(
+export async function getHeader(
   client: ccc.Client,
-  transactionHash: ccc.Hex,
-): Promise<TransactionHeader> {
-  // Get the TransactionHeader
-  const data = await client.getTransactionWithHeader(transactionHash);
-
-  // Validate TransactionHeader
-  if (!data) {
-    throw new Error("Transaction not found");
+  headerKey: HeaderKey,
+): Promise<ccc.ClientBlockHeader> {
+  const { type, value } = headerKey;
+  let header: ccc.ClientBlockHeader | undefined = undefined;
+  if (type === "hash") {
+    header = await client.getHeaderByHash(value);
+  } else if (type === "number") {
+    header = await client.getHeaderByNumber(value);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  } else if (type === "txHash") {
+    header = (await client.getTransactionWithHeader(value))?.header;
   }
-  const { transaction, header } = data;
+
   if (!header) {
     throw new Error("Header not found");
   }
 
-  return { transaction: transaction.transaction, header };
+  return header;
 }
 
 /**
