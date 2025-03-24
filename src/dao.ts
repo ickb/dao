@@ -1,4 +1,4 @@
-import { ccc } from "@ckb-ccc/core";
+import { ccc, mol } from "@ckb-ccc/core";
 import type { SmartTransaction, TransactionHeader } from "./transaction.js";
 import { epochCompare, getHeader } from "./utils.js";
 
@@ -133,7 +133,7 @@ export class Dao {
           lock: l,
           type: this.script,
         },
-        ccc.numLeToBytes(depositTransactionHeader.header.number, 8),
+        mol.Uint64LE.encode(depositTransactionHeader.header.number),
       );
     }
 
@@ -291,7 +291,7 @@ export class Dao {
 
       const depositHeader = await getHeader(client, {
         type: "number",
-        value: cell.outputData,
+        value: header.number,
       });
 
       yield new WithdrawalRequest(

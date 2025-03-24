@@ -1,4 +1,4 @@
-import { ccc } from "@ckb-ccc/core";
+import { ccc, mol } from "@ckb-ccc/core";
 import { Dao } from "./dao.js";
 import { getHeader, type HeaderKey } from "./utils.js";
 
@@ -182,7 +182,7 @@ export class SmartTransaction extends ccc.Transaction {
         // It's a withdrawal request cell, get header of previous deposit cell
         const depositHeader = await this.getHeader(client, {
           type: "number",
-          value: outputData,
+          value: mol.Uint64LE.decode(outputData),
         });
 
         return (
@@ -242,7 +242,8 @@ export class SmartTransaction extends ccc.Transaction {
    */
   encodeHeaderKey(headerKey: HeaderKey): string {
     const { type, value } = headerKey;
-    return ccc.bytesFrom(value).toString() + type;
+
+    return ccc.numFrom(value).toString() + type;
   }
 
   /**
@@ -268,7 +269,7 @@ export class SmartTransaction extends ccc.Transaction {
         }),
         this.encodeHeaderKey({
           type: "number",
-          value: ccc.numLeToBytes(number),
+          value: number,
         }),
       ];
       if (txHash) {

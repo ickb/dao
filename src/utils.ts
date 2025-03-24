@@ -2,21 +2,34 @@ import { ccc } from "@ckb-ccc/core";
 
 /**
  * Represents a key for retrieving a block header.
+ *
+ * The `HeaderKey` can be one of three shapes:
+ *
+ * 1. For hash type:
+ *    - `type`: Indicates that the header key is a block hash type, which is "hash".
+ *    - `value`: The value associated with the header key, represented as `ccc.HexLike`.
+ *
+ * 2. For number type:
+ *    - `type`: Indicates that the header key is a block number type, which is "number".
+ *    - `value`: The value associated with the header key, represented as `ccc.Num`.
+ *
+ * 3. For transaction hash type:
+ *    - `type`: Indicates that the header key is a transaction hash type, which is "txHash".
+ *    - `value`: The value associated with the header key, represented as `ccc.HexLike`.
  */
-export interface HeaderKey {
-  /**
-   * The type of the header key. It can be one of the following:
-   * - "hash": Indicates that the header key is a hash type.
-   * - "number": Indicates that the header key is a number type.
-   * - "txHash": Indicates that the header key is a transaction hash type.
-   */
-  type: "hash" | "number" | "txHash";
-
-  /**
-   * The Little-endian encoded value associated with the header key, represented as `ccc.HexLike`.
-   */
-  value: ccc.HexLike;
-}
+export type HeaderKey =
+  | {
+      type: "hash";
+      value: ccc.HexLike;
+    }
+  | {
+      type: "number";
+      value: ccc.Num;
+    }
+  | {
+      type: "txHash";
+      value: ccc.HexLike;
+    };
 
 /**
  * Retrieves the block header based on the provided header key.
