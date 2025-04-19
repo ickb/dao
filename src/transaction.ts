@@ -3,20 +3,33 @@ import { Dao } from "./dao.js";
 import { getHeader, type HeaderKey } from "./utils.js";
 
 /**
- * Interface representing a handler for User Defined Tokens (UDTs).
+ * Interface representing the full configuration needed for interacting with a Script
  */
-export interface UdtHandler {
-  /** The script associated with the UDT. */
+export interface ScriptDeps {
+  /**
+   * The script for which additional information is being provided.
+   * @type {ccc.Script}
+   */
   script: ccc.Script;
 
-  /** The cellDeps associated with the UDT. */
+  /**
+   * An array of cell dependencies associated with the script.
+   * @type {ccc.CellDep[]}
+   */
   cellDeps: ccc.CellDep[];
+}
 
+/**
+ * Interface representing a handler for User Defined Tokens (UDTs).
+ * This interface extends the ScriptDeps interface, meaning it also includes
+ * the properties defined in ScriptDeps: `script` and `cellDeps`.
+ */
+export interface UdtHandler extends ScriptDeps {
   /**
    * Asynchronously retrieves the balance of UDT inputs for a given transaction.
-   * @param client - The client instance used to interact with the blockchain.
-   * @param tx - The SmartTransaction for which to retrieve the UDT Inputs balance.
-   * @returns A promise that resolves to the balance of UDT inputs.
+   * @param {ccc.Client} client - The client used to interact with the blockchain.
+   * @param {SmartTransaction} tx - The transaction for which to retrieve the UDT input balance.
+   * @returns {Promise<bigint>} A promise that resolves to the balance of UDT inputs.
    */
   getInputsUdtBalance?: (
     client: ccc.Client,
@@ -25,8 +38,8 @@ export interface UdtHandler {
 
   /**
    * Retrieves the balance of UDT outputs for a given transaction.
-   * @param tx - The SmartTransaction for which to retrieve the UDT Outputs balance.
-   * @returns The balance of UDT outputs.
+   * @param {SmartTransaction} tx - The transaction for which to retrieve the UDT output balance.
+   * @returns {bigint} The balance of UDT outputs.
    */
   getOutputsUdtBalance?: (tx: SmartTransaction) => bigint;
 }

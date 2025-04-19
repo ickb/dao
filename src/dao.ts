@@ -1,11 +1,15 @@
 import { ccc, mol } from "@ckb-ccc/core";
-import type { SmartTransaction, TransactionHeader } from "./transaction.js";
+import type {
+  ScriptDeps,
+  SmartTransaction,
+  TransactionHeader,
+} from "./transaction.js";
 import { epochCompare, getHeader } from "./utils.js";
 
 /**
  * Represents NervosDAO functionalities.
  */
-export class Dao {
+export class Dao implements ScriptDeps {
   /**
    * Creates an instance of the Dao class.
    *
@@ -16,6 +20,15 @@ export class Dao {
     public script: ccc.Script,
     public cellDeps: ccc.CellDep[],
   ) {}
+
+  /**
+   * Returns a new instance of DAO.
+   *
+   * @returns A new instance of DAO.
+   */
+  static fromDeps(c: ScriptDeps): Dao {
+    return new Dao(c.script, c.cellDeps);
+  }
 
   /**
    * Checks if a given cell is a deposit.
