@@ -231,3 +231,29 @@ export function max<T>(...numbers: T[]): T {
 export function min<T>(...numbers: T[]): T {
   return numbers.reduce((a, b) => (a < b ? a : b));
 }
+
+/**
+ * Represents an asynchronous iterable type that can be either a synchronous iterable
+ * or an asynchronous generator.
+ *
+ * @template T - The type of elements in the iterable.
+ */
+export type AsyncIterable<T> = Iterable<T> | AsyncGenerator<T>;
+
+/**
+ * Converts an asynchronous iterable into an array.
+ *
+ * This function takes an `AsyncIterable` as input and returns a promise that resolves
+ * to an array containing all the elements yielded by the iterable.
+ *
+ * @template T - The type of elements in the input iterable.
+ * @param {AsyncIterable<T>} inputs - The asynchronous iterable to convert into an array.
+ * @returns {Promise<T[]>} A promise that resolves to an array of elements.
+ */
+export async function arrayFrom<T>(inputs: AsyncIterable<T>): Promise<T[]> {
+  const res = [];
+  for await (const i of inputs) {
+    res.push(i);
+  }
+  return res;
+}

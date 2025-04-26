@@ -226,7 +226,7 @@ export class DaoManager implements ScriptDeps {
       onChain?: boolean;
     },
   ): AsyncGenerator<DepositCell> {
-    const tipHeader = options?.tip
+    const tip = options?.tip
       ? ccc.ClientBlockHeader.from(options.tip)
       : await client.getTipHeader();
 
@@ -253,13 +253,7 @@ export class DaoManager implements ScriptDeps {
         continue;
       }
 
-      const txHash = cell.outPoint.txHash;
-      const header = await getHeader(client, {
-        type: "txHash",
-        value: txHash,
-      });
-
-      yield new DepositCell(cell, { header, txHash }, tipHeader);
+      yield DepositCell.fromClient(client, cell, tip);
     }
   }
 
@@ -300,22 +294,7 @@ export class DaoManager implements ScriptDeps {
         continue;
       }
 
-      const txHash = cell.outPoint.txHash;
-      const header = await getHeader(client, {
-        type: "txHash",
-        value: txHash,
-      });
-
-      const depositHeader = await getHeader(client, {
-        type: "number",
-        value: header.number,
-      });
-
-      yield new WithdrawalRequestCell(
-        cell,
-        { header: depositHeader },
-        { header, txHash },
-      );
+      yield WithdrawalRequestCell.fromClient(client, cell);
     }
   }
 }
@@ -377,10 +356,10 @@ export abstract class DaoCell {
  */
 export class DepositCell extends DaoCell {
   /**
-   * Creates an instance of Deposit.
-   * @param cell - The cell associated with this deposit.
-   * @param deposit - The transaction header for the deposit.
-   * @param tip - The client block header representing the latest block.
+   * Creates an instance of DepositCell.
+   * @param {ccc.Cell} cell - The cell associated with this deposit.
+   * @param {TransactionHeader} deposit - The transaction header for the deposit.
+   * @param {ccc.ClientBlockHeader} tip - The client block header representing the latest block.
    */
   constructor(
     cell: ccc.Cell,
@@ -394,8 +373,36 @@ export class DepositCell extends DaoCell {
   }
 
   /**
+   * Creates a DepositCell instance from a client and a cell or outPoint.
+   * @param {ccc.Client} client - The client used to fetch the cell.
+   * @param {ccc.Cell | ccc.OutPoint} c - The cell or outPoint to retrieve the deposit cell.
+   * @param {ccc.ClientBlockHeader} tip - The client block header representing the latest block.
+   * @returns {Promise<DepositCell>} A promise that resolves to a DepositCell instance.
+   * @throws {Error} If the deposit cell is not found at the outPoint.
+   */
+  static async fromClient(
+    client: ccc.Client,
+    c: ccc.Cell | ccc.OutPoint,
+    tip: ccc.ClientBlockHeader,
+  ): Promise<DepositCell> {
+    const cell = "cellOutput" in c ? c : await client.getCell(c);
+    if (!cell) {
+      throw Error("No Deposit Cell not found at the outPoint");
+    }
+
+    const txHash = cell.outPoint.txHash;
+    const header = await getHeader(client, {
+      type: "txHash",
+      value: txHash,
+    });
+
+    return new DepositCell(cell, { header, txHash }, tip);
+  }
+
+  /**
    * Updates the deposit's interests and maturity based on the latest block header.
-   * @param tip - The client block header representing the latest block.
+   * @param {ccc.ClientBlockHeader} tip - The client block header representing the latest block.
+   * @throws {Error} If the deposit TransactionHeader is not found.
    */
   update(tip: ccc.ClientBlockHeader): void {
     const depositHeader = this.transactionHeaders[0]?.header;
@@ -416,4 +423,38 @@ export class DepositCell extends DaoCell {
  * Class representing a withdrawal request cell in NervosDAO.
  * Inherits from DaoCell and represents a specific type of NervosDAO cell for withdrawal requests.
  */
-export class WithdrawalRequestCell extends DaoCell {}
+export class WithdrawalRequestCell extends DaoCell {
+  /**
+   * Creates a WithdrawalRequestCell instance from a client and a cell or outPoint.
+   * @param {ccc.Client} client - The client used to fetch the cell.
+   * @param {ccc.Cell | ccc.OutPoint} c - The cell or outPoint to retrieve the withdrawal request cell.
+   * @returns {Promise<WithdrawalRequestCell>} A promise that resolves to a WithdrawalRequestCell instance.
+   * @throws {Error} If the withdrawal request cell is not found at the outPoint.
+   */
+  static async fromClient(
+    client: ccc.Client,
+    c: ccc.Cell | ccc.OutPoint,
+  ): Promise<WithdrawalRequestCell> {
+    const cell = "cellOutput" in c ? c : await client.getCell(c);
+    if (!cell) {
+      throw Error("No Withdrawal Request Cell not found at the outPoint");
+    }
+
+    const txHash = cell.outPoint.txHash;
+    const header = await getHeader(client, {
+      type: "txHash",
+      value: txHash,
+    });
+
+    const depositHeader = await getHeader(client, {
+      type: "number",
+      value: header.number,
+    });
+
+    return new WithdrawalRequestCell(
+      cell,
+      { header: depositHeader },
+      { header, txHash },
+    );
+  }
+}

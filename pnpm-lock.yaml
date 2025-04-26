@@ -400,8 +400,8 @@ packages:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
 
-  ethers@6.13.5:
-    resolution: {integrity: sha512-+knKNieu5EKRThQJWwqaJ10a6HE9sSehGeqWN65//wE7j47ZpFhKAnHB/JJFibwwg61I/koxaPsXbXpD/skNOQ==}
+  ethers@6.13.7:
+    resolution: {integrity: sha512-qbaJ0uIrjh+huP1Lad2f2QtzW5dcqSVjIzVH6yWB4dKoMuj2WqYz5aMeeQTCNpAKgTJBM5J9vcc2cYJ23UAimQ==}
     engines: {node: '>=14.0.0'}
 
   event-target-shim@5.0.1:
@@ -798,7 +798,7 @@ snapshots:
       bs58check: 4.0.0
       buffer: 6.0.3
       cross-fetch: 4.1.0
-      ethers: 6.13.5
+      ethers: 6.13.7
       isomorphic-ws: 5.0.0(ws@8.18.1)
       ws: 8.18.1
     transitivePeerDependencies:
@@ -1265,7 +1265,7 @@ snapshots:
 
   esutils@2.0.3: {}
 
-  ethers@6.13.5:
+  ethers@6.13.7:
     dependencies:
       '@adraffy/ens-normalize': 1.10.1
       '@noble/curves': 1.2.0

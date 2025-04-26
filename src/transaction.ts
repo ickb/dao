@@ -29,19 +29,19 @@ export interface UdtHandler extends ScriptDeps {
    * Asynchronously retrieves the balance of UDT inputs for a given transaction.
    * @param {ccc.Client} client - The client used to interact with the blockchain.
    * @param {SmartTransaction} tx - The transaction for which to retrieve the UDT input balance.
-   * @returns {Promise<bigint>} A promise that resolves to the balance of UDT inputs.
+   * @returns {Promise<ccc.FixedPoint>} A promise that resolves to the balance of UDT inputs.
    */
   getInputsUdtBalance?: (
     client: ccc.Client,
     tx: SmartTransaction,
-  ) => Promise<bigint>;
+  ) => Promise<ccc.FixedPoint>;
 
   /**
    * Retrieves the balance of UDT outputs for a given transaction.
    * @param {SmartTransaction} tx - The transaction for which to retrieve the UDT output balance.
-   * @returns {bigint} The balance of UDT outputs.
+   * @returns {ccc.FixedPoint} The balance of UDT outputs.
    */
-  getOutputsUdtBalance?: (tx: SmartTransaction) => bigint;
+  getOutputsUdtBalance?: (tx: SmartTransaction) => ccc.FixedPoint;
 }
 
 /**
@@ -126,7 +126,7 @@ export class SmartTransaction extends ccc.Transaction {
   override getInputsUdtBalance(
     client: ccc.Client,
     udtLike: ccc.ScriptLike,
-  ): Promise<bigint> {
+  ): Promise<ccc.FixedPoint> {
     const udt = ccc.Script.from(udtLike);
     return (
       this.getUdtHandler(udt)?.getInputsUdtBalance?.(client, this) ??
@@ -140,7 +140,7 @@ export class SmartTransaction extends ccc.Transaction {
    * @param udtLike - The UDT script or script-like object.
    * @returns A promise that resolves to the balance of UDT outputs.
    */
-  override getOutputsUdtBalance(udtLike: ccc.ScriptLike): bigint {
+  override getOutputsUdtBalance(udtLike: ccc.ScriptLike): ccc.FixedPoint {
     const udt = ccc.Script.from(udtLike);
     return (
       this.getUdtHandler(udt)?.getOutputsUdtBalance?.(this) ??
@@ -157,7 +157,7 @@ export class SmartTransaction extends ccc.Transaction {
     const { hashType, codeHash } = await client.getKnownScript(
       ccc.KnownScript.NervosDao,
     );
-    const dao = new DaoManager(
+    const daoManager = new DaoManager(
       ccc.Script.from({ codeHash, hashType, args: "0x" }),
       [],
     );
@@ -182,7 +182,7 @@ export class SmartTransaction extends ccc.Transaction {
         total += cellOutput.capacity;
 
         // If not a NervosDAO Withdrawal Request cell, return
-        if (!dao.isWithdrawalRequest(cell)) {
+        if (!daoManager.isWithdrawalRequest(cell)) {
           return total;
         }
 
@@ -203,7 +203,7 @@ export class SmartTransaction extends ccc.Transaction {
           ccc.calcDaoProfit(cell.capacityFree, depositHeader, withdrawHeader)
         );
       },
-      ccc.numFrom(0),
+      ccc.Zero,
     );
   }
 
