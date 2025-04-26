@@ -1,6 +1,6 @@
 {
   "name": "@ickb/dao",
-  "version": "1000.0.12",
+  "version": "1000.0.13",
   "description": "NervosDAO utilities built on top of CCC",
   "author": "phroi",
   "license": "MIT",
@@ -30,11 +30,11 @@
     "provenance": true
   },
   "devDependencies": {
-    "@eslint/js": "^9.25.0",
-    "eslint": "^9.25.0",
+    "@eslint/js": "^9.25.1",
+    "eslint": "^9.25.1",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.30.1"
+    "typescript-eslint": "^8.31.0"
   },
   "dependencies": {
     "@ckb-ccc/core": "^1.8.0"

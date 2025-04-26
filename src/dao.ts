@@ -7,11 +7,11 @@ import type {
 import { epochCompare, getHeader } from "./utils.js";
 
 /**
- * Represents NervosDAO functionalities.
+ * Manage NervosDAO functionalities.
  */
-export class Dao implements ScriptDeps {
+export class DaoManager implements ScriptDeps {
   /**
-   * Creates an instance of the Dao class.
+   * Creates an instance of the DaoManager class.
    *
    * @param script - The script associated with the NervosDAO.
    * @param cellDeps - An array of cell dependencies for the NervosDAO.
@@ -22,12 +22,12 @@ export class Dao implements ScriptDeps {
   ) {}
 
   /**
-   * Returns a new instance of DAO.
+   * Returns a new instance of DaoManager.
    *
-   * @returns A new instance of DAO.
+   * @returns A new instance of DaoManager.
    */
-  static fromDeps(c: ScriptDeps): Dao {
-    return new Dao(c.script, c.cellDeps);
+  static fromDeps(c: ScriptDeps): DaoManager {
+    return new DaoManager(c.script, c.cellDeps);
   }
 
   /**
@@ -42,7 +42,9 @@ export class Dao implements ScriptDeps {
       outputData,
     } = ccc.Cell.from(cell);
 
-    return outputData === Dao.depositData() && type?.eq(this.script) === true;
+    return (
+      outputData === DaoManager.depositData() && type?.eq(this.script) === true
+    );
   }
 
   /**
@@ -57,7 +59,9 @@ export class Dao implements ScriptDeps {
       outputData,
     } = ccc.Cell.from(cell);
 
-    return outputData !== Dao.depositData() && type?.eq(this.script) === true;
+    return (
+      outputData !== DaoManager.depositData() && type?.eq(this.script) === true
+    );
   }
 
   /**
@@ -92,7 +96,7 @@ export class Dao implements ScriptDeps {
           lock: l,
           type: this.script,
         },
-        Dao.depositData(),
+        DaoManager.depositData(),
       );
     }
   }
@@ -111,7 +115,7 @@ export class Dao implements ScriptDeps {
    */
   requestWithdrawal(
     tx: SmartTransaction,
-    deposits: Deposit[],
+    deposits: DepositCell[],
     lock: ccc.ScriptLike,
     sameSizeArgs = true,
   ): SmartTransaction {
@@ -162,7 +166,7 @@ export class Dao implements ScriptDeps {
    */
   withdraw(
     tx: SmartTransaction,
-    withdrawalRequests: WithdrawalRequest[],
+    withdrawalRequests: WithdrawalRequestCell[],
   ): void {
     tx.addCellDeps(this.cellDeps);
 
@@ -221,7 +225,7 @@ export class Dao implements ScriptDeps {
       tip?: ccc.ClientBlockHeaderLike;
       onChain?: boolean;
     },
-  ): AsyncGenerator<Deposit> {
+  ): AsyncGenerator<DepositCell> {
     const tipHeader = options?.tip
       ? ccc.ClientBlockHeader.from(options.tip)
       : await client.getTipHeader();
@@ -232,7 +236,7 @@ export class Dao implements ScriptDeps {
         scriptType: "lock",
         filter: {
           script: this.script,
-          outputData: Dao.depositData(),
+          outputData: DaoManager.depositData(),
           outputDataSearchMode: "exact",
         },
         scriptSearchMode: "exact",
@@ -255,7 +259,7 @@ export class Dao implements ScriptDeps {
         value: txHash,
       });
 
-      yield new Deposit(cell, { header, txHash }, tipHeader);
+      yield new DepositCell(cell, { header, txHash }, tipHeader);
     }
   }
 
@@ -266,7 +270,7 @@ export class Dao implements ScriptDeps {
    * @param lock - The lock script to filter withdrawal requests.
    * @param options - Optional parameters for the search.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
-   * @returns An async generator that yields WithdrawalRequest objects.
+   * @returns An async generator that yields Withdrawal request objects.
    */
   async *findWithdrawalRequests(
     client: ccc.Client,
@@ -274,7 +278,7 @@ export class Dao implements ScriptDeps {
     options?: {
       onChain?: boolean;
     },
-  ): AsyncGenerator<WithdrawalRequest> {
+  ): AsyncGenerator<WithdrawalRequestCell> {
     const findCellsArgs = [
       {
         script: lock,
@@ -307,7 +311,7 @@ export class Dao implements ScriptDeps {
         value: header.number,
       });
 
-      yield new WithdrawalRequest(
+      yield new WithdrawalRequestCell(
         cell,
         { header: depositHeader },
         { header, txHash },
@@ -368,10 +372,10 @@ export abstract class DaoCell {
 }
 
 /**
- * Class representing a deposit in NervosDAO.
+ * Class representing a deposit cell in NervosDAO.
  * Inherits from DaoCell and represents a specific type of NervosDAO cell for deposits.
  */
-export class Deposit extends DaoCell {
+export class DepositCell extends DaoCell {
   /**
    * Creates an instance of Deposit.
    * @param cell - The cell associated with this deposit.
@@ -409,7 +413,7 @@ export class Deposit extends DaoCell {
 }
 
 /**
- * Class representing a withdrawal request in NervosDAO.
+ * Class representing a withdrawal request cell in NervosDAO.
  * Inherits from DaoCell and represents a specific type of NervosDAO cell for withdrawal requests.
  */
-export class WithdrawalRequest extends DaoCell {}
+export class WithdrawalRequestCell extends DaoCell {}

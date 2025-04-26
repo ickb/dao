@@ -1,5 +1,5 @@
 import { ccc, mol } from "@ckb-ccc/core";
-import { Dao } from "./dao.js";
+import { DaoManager } from "./dao.js";
 import { getHeader, type HeaderKey } from "./utils.js";
 
 /**
@@ -157,7 +157,7 @@ export class SmartTransaction extends ccc.Transaction {
     const { hashType, codeHash } = await client.getKnownScript(
       ccc.KnownScript.NervosDao,
     );
-    const dao = new Dao(
+    const dao = new DaoManager(
       ccc.Script.from({ codeHash, hashType, args: "0x" }),
       [],
     );
