@@ -1,162 +1,112 @@
-import { ccc } from "@ckb-ccc/core";
-import { epochCompare, getHeader, type TransactionHeader } from "@ickb/utils";
+import { ccc, mol } from "@ckb-ccc/core";
+import { getHeader, type TransactionHeader } from "@ickb/utils";
 
 /**
- * Abstract class representing a NervosDAO cell.
- * This class serves as a base for specific types of NervosDAO cells, such as deposits and withdrawal requests.
+ * Represents a DAO cell with its associated properties.
  */
-export abstract class DaoCell {
-  /** The cell associated with this NervosDAO cell. */
-  public cell: ccc.Cell;
+export interface DaoCell {
+  /** The DAO cell. */
+  cell: ccc.Cell;
 
-  /** An array of transaction headers related to this NervosDAO cell. */
-  public transactionHeaders: TransactionHeader[];
-
-  /** The interests accrued for this NervosDAO cell. */
-  public interests: ccc.Num;
-
-  /** The maturity epoch of this NervosDAO cell. */
-  public maturity: ccc.Epoch;
+  /** Indicates whether the cell is a deposit. */
+  isDeposit: boolean;
 
   /**
-   * Creates an instance of DaoCell.
-   * @param cell - The cell associated with this NervosDAO cell.
-   * @param deposit - The transaction header for the deposit.
-   * @param withdrawalRequest - The transaction header for the withdrawal request.
+   * The headers associated with the transaction.
+   * In case of deposit, it contains [depositHeader, tipHeader],
+   * while in case of withdrawal request, it contains [depositHeader, withdrawalRequestHeader].
    */
-  constructor(
-    cell: ccc.Cell,
-    deposit: TransactionHeader,
-    withdrawalRequest: TransactionHeader,
-  ) {
-    this.cell = cell;
-    this.transactionHeaders = [deposit, withdrawalRequest];
-    this.interests = ccc.calcDaoProfit(
-      this.cell.capacityFree,
-      deposit.header,
-      withdrawalRequest.header,
-    );
-    this.maturity = ccc.calcDaoClaimEpoch(
-      deposit.header,
-      withdrawalRequest.header,
-    );
-  }
+  headers: [TransactionHeader, TransactionHeader];
 
-  /**
-   * Compares the maturity of this NervosDAO cell with another NervosDAO cell.
-   * @param other - The other NervosDAO cell to compare against.
-   * @returns 1 if this cell is more mature, 0 if they are equal, -1 if this cell is less mature.
-   */
-  maturityCompare(other: DaoCell): 1 | 0 | -1 {
-    return epochCompare(this.maturity, other.maturity);
-  }
+  /** The interests accrued on the DAO cell. */
+  interests: ccc.Num;
+
+  /** The maturity epoch of the DAO cell. */
+  maturity: ccc.Epoch;
 }
 
 /**
- * Class representing a deposit cell in NervosDAO.
- * Inherits from DaoCell and represents a specific type of NervosDAO cell for deposits.
+ * Creates a DaoCell from the provided options.
+ *
+ * @param options - The options to create a DaoCell. It can be one of the following:
+ * - An object omitting "interests" and "maturity" from DaoCell.
+ * - An object containing a cell, isDeposit flag, client, and an optional tip.
+ * - An object containing an outpoint, isDeposit flag, client, and an optional tip.
+ *
+ * @returns A promise that resolves to a DaoCell.
+ *
+ * @throws Error if the cell is not found.
  */
-export class DepositCell extends DaoCell {
-  /**
-   * Creates an instance of DepositCell.
-   * @param {ccc.Cell} cell - The cell associated with this deposit.
-   * @param {TransactionHeader} deposit - The transaction header for the deposit.
-   * @param {ccc.ClientBlockHeader} tip - The client block header representing the latest block.
-   */
-  constructor(
-    cell: ccc.Cell,
-    deposit: TransactionHeader,
-    tip: ccc.ClientBlockHeader,
-  ) {
-    super(cell, deposit, {
-      header: tip,
-    });
-    this.transactionHeaders.pop(); // Remove the withdrawal request header as it's not applicable for deposits.
+
+export async function DaoCellFrom(
+  options:
+    | Omit<DaoCell, "interests" | "maturity">
+    | {
+        cell: ccc.Cell;
+        isDeposit: boolean;
+        client: ccc.Client;
+        tip?: ccc.ClientBlockHeader;
+      }
+    | {
+        outpoint: ccc.OutPoint;
+        isDeposit: boolean;
+        client: ccc.Client;
+        tip?: ccc.ClientBlockHeader;
+      },
+): Promise<DaoCell> {
+  const isDeposit = options.isDeposit;
+  const cell =
+    "cell" in options
+      ? options.cell
+      : await options.client.getCell(options.outpoint);
+  if (!cell) {
+    throw Error("Cell not found");
   }
 
-  /**
-   * Creates a DepositCell instance from a client and a cell or outPoint.
-   * @param {ccc.Client} client - The client used to fetch the cell.
-   * @param {ccc.Cell | ccc.OutPoint} c - The cell or outPoint to retrieve the deposit cell.
-   * @param {ccc.ClientBlockHeader} tip - The client block header representing the latest block.
-   * @returns {Promise<DepositCell>} A promise that resolves to a DepositCell instance.
-   * @throws {Error} If the deposit cell is not found at the outPoint.
-   */
-  static async fromClient(
-    client: ccc.Client,
-    c: ccc.Cell | ccc.OutPoint,
-    tip: ccc.ClientBlockHeader,
-  ): Promise<DepositCell> {
-    const cell = "cellOutput" in c ? c : await client.getCell(c);
-    if (!cell) {
-      throw Error("No Deposit Cell not found at the outPoint");
-    }
+  const txHash = cell.outPoint.txHash;
+  const oldest =
+    "headers" in options
+      ? options.headers[0]
+      : !isDeposit
+        ? {
+            header: await getHeader(options.client, {
+              type: "number",
+              value: mol.Uint64LE.decode(cell.outputData),
+            }),
+          }
+        : {
+            header: await getHeader(options.client, {
+              type: "txHash",
+              value: txHash,
+            }),
+            txHash,
+          };
 
-    const txHash = cell.outPoint.txHash;
-    const header = await getHeader(client, {
-      type: "txHash",
-      value: txHash,
-    });
+  const newest =
+    "headers" in options
+      ? options.headers[1]
+      : !isDeposit
+        ? {
+            header: await getHeader(options.client, {
+              type: "txHash",
+              value: txHash,
+            }),
+            txHash,
+          }
+        : { header: options.tip ?? (await options.client.getTipHeader()) };
 
-    return new DepositCell(cell, { header, txHash }, tip);
-  }
+  const interests = ccc.calcDaoProfit(
+    cell.capacityFree,
+    oldest.header,
+    newest.header,
+  );
+  const maturity = ccc.calcDaoClaimEpoch(oldest.header, newest.header);
 
-  /**
-   * Updates the deposit's interests and maturity based on the latest block header.
-   * @param {ccc.ClientBlockHeader} tip - The client block header representing the latest block.
-   * @throws {Error} If the deposit TransactionHeader is not found.
-   */
-  update(tip: ccc.ClientBlockHeader): void {
-    const depositHeader = this.transactionHeaders[0]?.header;
-    if (!depositHeader) {
-      throw Error("Deposit TransactionHeader not found");
-    }
-
-    this.interests = ccc.calcDaoProfit(
-      this.cell.capacityFree,
-      depositHeader,
-      tip,
-    );
-    this.maturity = ccc.calcDaoClaimEpoch(depositHeader, tip);
-  }
-}
-
-/**
- * Class representing a withdrawal request cell in NervosDAO.
- * Inherits from DaoCell and represents a specific type of NervosDAO cell for withdrawal requests.
- */
-export class WithdrawalRequestCell extends DaoCell {
-  /**
-   * Creates a WithdrawalRequestCell instance from a client and a cell or outPoint.
-   * @param {ccc.Client} client - The client used to fetch the cell.
-   * @param {ccc.Cell | ccc.OutPoint} c - The cell or outPoint to retrieve the withdrawal request cell.
-   * @returns {Promise<WithdrawalRequestCell>} A promise that resolves to a WithdrawalRequestCell instance.
-   * @throws {Error} If the withdrawal request cell is not found at the outPoint.
-   */
-  static async fromClient(
-    client: ccc.Client,
-    c: ccc.Cell | ccc.OutPoint,
-  ): Promise<WithdrawalRequestCell> {
-    const cell = "cellOutput" in c ? c : await client.getCell(c);
-    if (!cell) {
-      throw Error("No Withdrawal Request Cell not found at the outPoint");
-    }
-
-    const txHash = cell.outPoint.txHash;
-    const header = await getHeader(client, {
-      type: "txHash",
-      value: txHash,
-    });
-
-    const depositHeader = await getHeader(client, {
-      type: "number",
-      value: header.number,
-    });
-
-    return new WithdrawalRequestCell(
-      cell,
-      { header: depositHeader },
-      { header, txHash },
-    );
-  }
+  return {
+    cell,
+    isDeposit,
+    headers: [oldest, newest],
+    interests,
+    maturity,
+  };
 }

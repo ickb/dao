@@ -1,6 +1,6 @@
 import { ccc, mol } from "@ckb-ccc/core";
 import type { ScriptDeps, SmartTransaction } from "@ickb/utils";
-import { DepositCell, WithdrawalRequestCell } from "./cells.js";
+import { DaoCellFrom as DaoCellFrom, type DaoCell } from "./cells.js";
 
 /**
  * Manage NervosDAO functionalities.
@@ -111,7 +111,7 @@ export class DaoManager implements ScriptDeps {
    */
   requestWithdrawal(
     tx: SmartTransaction,
-    deposits: DepositCell[],
+    deposits: DaoCell[],
     lock: ccc.ScriptLike,
     sameSizeArgs = true,
   ): void {
@@ -119,26 +119,25 @@ export class DaoManager implements ScriptDeps {
       tx.inputs.length != tx.outputs.length ||
       tx.outputs.length != tx.outputsData.length
     ) {
-      throw new Error("Transaction have different inputs and outputs lengths");
+      throw Error("Transaction have different inputs and outputs lengths");
     }
 
     tx.addCellDeps(this.cellDeps);
 
     const l = ccc.Script.from(lock);
     for (const deposit of deposits) {
-      const { cell, transactionHeaders } = deposit;
+      const { cell, isDeposit, headers } = deposit;
+      if (!isDeposit) {
+        throw Error("Not a deposit");
+      }
       if (sameSizeArgs && cell.cellOutput.lock.args.length != l.args.length) {
-        throw new Error(
+        throw Error(
           "Withdrawal request lock args has different size from deposit",
         );
       }
 
-      const depositTransactionHeader = transactionHeaders[0];
-      if (!depositTransactionHeader) {
-        throw Error("Deposit TransactionHeader not found in Deposit");
-      }
-
-      tx.addHeaders(transactionHeaders);
+      const depositHeader = headers[0];
+      tx.addHeaders(depositHeader);
       tx.addInput(cell);
       tx.addOutput(
         {
@@ -146,7 +145,7 @@ export class DaoManager implements ScriptDeps {
           lock: l,
           type: this.script,
         },
-        mol.Uint64LE.encode(depositTransactionHeader.header.number),
+        mol.Uint64LE.encode(depositHeader.header.number),
       );
     }
   }
@@ -158,26 +157,24 @@ export class DaoManager implements ScriptDeps {
    * @param withdrawalRequests - An array of withdrawal requests to process.
    * @returns void.
    */
-  withdraw(
-    tx: SmartTransaction,
-    withdrawalRequests: WithdrawalRequestCell[],
-  ): void {
+  withdraw(tx: SmartTransaction, withdrawalRequests: DaoCell[]): void {
     tx.addCellDeps(this.cellDeps);
 
     for (const withdrawalRequest of withdrawalRequests) {
       const {
         cell: { outPoint, cellOutput, outputData },
-        transactionHeaders,
+        isDeposit,
+        headers,
         maturity,
       } = withdrawalRequest;
-      tx.addHeaders(transactionHeaders);
-
-      const depositTransactionHeader = transactionHeaders[0];
-      if (!depositTransactionHeader) {
-        throw Error("Deposit TransactionHeader not found in WithdrawalRequest");
+      if (isDeposit) {
+        throw Error("Not a withdrawal request");
       }
+
+      tx.addHeaders(headers);
+      const depositHeader = headers[0];
       const headerIndex = tx.headerDeps.findIndex(
-        (h) => h === depositTransactionHeader.header.hash,
+        (h) => h === depositHeader.header.hash,
       );
 
       const inputIndex =
@@ -195,7 +192,7 @@ export class DaoManager implements ScriptDeps {
       const witness =
         tx.getWitnessArgsAt(inputIndex) ?? ccc.WitnessArgs.from({});
       if (witness.inputType) {
-        throw new Error("Witnesses of withdrawal request already in use");
+        throw Error("Witnesses of withdrawal request already in use");
       }
       witness.inputType = ccc.hexFrom(ccc.numLeToBytes(headerIndex, 8));
       tx.setWitnessArgsAt(inputIndex, witness);
@@ -210,7 +207,7 @@ export class DaoManager implements ScriptDeps {
    * @param options - Optional parameters for the search.
    * @param options.tip - An optional tip block header to use as a reference.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
-   * @returns An async generator that yields Deposit objects.
+   * @returns An async generator that yields deposits in form of DaoCells.
    */
   async *findDeposits(
     client: ccc.Client,
@@ -219,7 +216,7 @@ export class DaoManager implements ScriptDeps {
       tip?: ccc.ClientBlockHeaderLike;
       onChain?: boolean;
     },
-  ): AsyncGenerator<DepositCell> {
+  ): AsyncGenerator<DaoCell> {
     const tip = options?.tip
       ? ccc.ClientBlockHeader.from(options.tip)
       : await client.getTipHeader();
@@ -248,7 +245,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield DepositCell.fromClient(client, cell, tip);
+        yield DaoCellFrom({ cell, isDeposit: true, client, tip });
       }
     }
   }
@@ -260,7 +257,7 @@ export class DaoManager implements ScriptDeps {
    * @param locks - The lock scripts to filter withdrawal requests.
    * @param options - Optional parameters for the search.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
-   * @returns An async generator that yields Withdrawal request objects.
+   * @returns An async generator that yields withdrawal requests in form of DaoCells.
    */
   async *findWithdrawalRequests(
     client: ccc.Client,
@@ -268,7 +265,7 @@ export class DaoManager implements ScriptDeps {
     options?: {
       onChain?: boolean;
     },
-  ): AsyncGenerator<WithdrawalRequestCell> {
+  ): AsyncGenerator<DaoCell> {
     for (const lock of locks) {
       const findCellsArgs = [
         {
@@ -291,7 +288,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield WithdrawalRequestCell.fromClient(client, cell);
+        yield DaoCellFrom({ cell, isDeposit: false, client });
       }
     }
   }
