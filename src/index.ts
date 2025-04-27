@@ -84,7 +84,7 @@ export class DaoManager implements ScriptDeps {
    */
   deposit(
     tx: SmartTransaction,
-    capacities: ccc.FixedPoint[],
+    capacities: ccc.FixedPointLike[],
     lock: ccc.ScriptLike,
   ): void {
     tx.addCellDeps(this.cellDeps);
@@ -119,7 +119,7 @@ export class DaoManager implements ScriptDeps {
     deposits: DepositCell[],
     lock: ccc.ScriptLike,
     sameSizeArgs = true,
-  ): SmartTransaction {
+  ): void {
     if (
       tx.inputs.length != tx.outputs.length ||
       tx.outputs.length != tx.outputsData.length
@@ -154,8 +154,6 @@ export class DaoManager implements ScriptDeps {
         mol.Uint64LE.encode(depositTransactionHeader.header.number),
       );
     }
-
-    return tx;
   }
 
   /**
