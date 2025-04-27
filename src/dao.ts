@@ -206,7 +206,7 @@ export class DaoManager implements ScriptDeps {
    * Asynchronously finds deposits associated with a given lock script.
    *
    * @param client - The client used to interact with the blockchain.
-   * @param lock - The lock script to filter deposits.
+   * @param locks - The lock scripts to filter deposits.
    * @param options - Optional parameters for the search.
    * @param options.tip - An optional tip block header to use as a reference.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
@@ -214,7 +214,7 @@ export class DaoManager implements ScriptDeps {
    */
   async *findDeposits(
     client: ccc.Client,
-    lock: ccc.ScriptLike,
+    locks: ccc.ScriptLike[],
     options?: {
       tip?: ccc.ClientBlockHeaderLike;
       onChain?: boolean;
@@ -224,30 +224,32 @@ export class DaoManager implements ScriptDeps {
       ? ccc.ClientBlockHeader.from(options.tip)
       : await client.getTipHeader();
 
-    const findCellsArgs = [
-      {
-        script: lock,
-        scriptType: "lock",
-        filter: {
-          script: this.script,
-          outputData: DaoManager.depositData(),
-          outputDataSearchMode: "exact",
+    for (const lock of locks) {
+      const findCellsArgs = [
+        {
+          script: lock,
+          scriptType: "lock",
+          filter: {
+            script: this.script,
+            outputData: DaoManager.depositData(),
+            outputDataSearchMode: "exact",
+          },
+          scriptSearchMode: "exact",
+          withData: true,
         },
-        scriptSearchMode: "exact",
-        withData: true,
-      },
-      "asc",
-      400, // https://github.com/nervosnetwork/ckb/pull/4576
-    ] as const;
+        "asc",
+        400, // https://github.com/nervosnetwork/ckb/pull/4576
+      ] as const;
 
-    for await (const cell of options?.onChain
-      ? client.findCellsOnChain(...findCellsArgs)
-      : client.findCells(...findCellsArgs)) {
-      if (!this.isDeposit(cell) || !cell.cellOutput.lock.eq(lock)) {
-        continue;
+      for await (const cell of options?.onChain
+        ? client.findCellsOnChain(...findCellsArgs)
+        : client.findCells(...findCellsArgs)) {
+        if (!this.isDeposit(cell) || !cell.cellOutput.lock.eq(lock)) {
+          continue;
+        }
+
+        yield DepositCell.fromClient(client, cell, tip);
       }
-
-      yield DepositCell.fromClient(client, cell, tip);
     }
   }
 
@@ -255,40 +257,42 @@ export class DaoManager implements ScriptDeps {
    * Asynchronously finds withdrawal requests associated with a given lock script.
    *
    * @param client - The client used to interact with the blockchain.
-   * @param lock - The lock script to filter withdrawal requests.
+   * @param locks - The lock scripts to filter withdrawal requests.
    * @param options - Optional parameters for the search.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
    * @returns An async generator that yields Withdrawal request objects.
    */
   async *findWithdrawalRequests(
     client: ccc.Client,
-    lock: ccc.ScriptLike,
+    locks: ccc.ScriptLike[],
     options?: {
       onChain?: boolean;
     },
   ): AsyncGenerator<WithdrawalRequestCell> {
-    const findCellsArgs = [
-      {
-        script: lock,
-        scriptType: "lock",
-        filter: {
-          script: this.script,
+    for (const lock of locks) {
+      const findCellsArgs = [
+        {
+          script: lock,
+          scriptType: "lock",
+          filter: {
+            script: this.script,
+          },
+          scriptSearchMode: "exact",
+          withData: true,
         },
-        scriptSearchMode: "exact",
-        withData: true,
-      },
-      "asc",
-      400, // https://github.com/nervosnetwork/ckb/pull/4576
-    ] as const;
+        "asc",
+        400, // https://github.com/nervosnetwork/ckb/pull/4576
+      ] as const;
 
-    for await (const cell of options?.onChain
-      ? client.findCellsOnChain(...findCellsArgs)
-      : client.findCells(...findCellsArgs)) {
-      if (!this.isWithdrawalRequest(cell) || !cell.cellOutput.lock.eq(lock)) {
-        continue;
+      for await (const cell of options?.onChain
+        ? client.findCellsOnChain(...findCellsArgs)
+        : client.findCells(...findCellsArgs)) {
+        if (!this.isWithdrawalRequest(cell) || !cell.cellOutput.lock.eq(lock)) {
+          continue;
+        }
+
+        yield WithdrawalRequestCell.fromClient(client, cell);
       }
-
-      yield WithdrawalRequestCell.fromClient(client, cell);
     }
   }
 }
