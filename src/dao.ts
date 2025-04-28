@@ -1,6 +1,6 @@
 import { ccc, mol } from "@ckb-ccc/core";
 import type { ScriptDeps, SmartTransaction } from "@ickb/utils";
-import { DaoCellFrom as DaoCellFrom, type DaoCell } from "./cells.js";
+import { daoCellFrom as daoCellFrom, type DaoCell } from "./cells.js";
 
 /**
  * Manage NervosDAO functionalities.
@@ -22,8 +22,8 @@ export class DaoManager implements ScriptDeps {
    *
    * @returns A new instance of DaoManager.
    */
-  static fromDeps(c: ScriptDeps): DaoManager {
-    return new DaoManager(c.script, c.cellDeps);
+  static fromDeps(deps: ScriptDeps): DaoManager {
+    return new DaoManager(deps.script, deps.cellDeps);
   }
 
   /**
@@ -245,7 +245,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield DaoCellFrom({ cell, isDeposit: true, client, tip });
+        yield daoCellFrom({ cell, isDeposit: true, client, tip });
       }
     }
   }
@@ -288,7 +288,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield DaoCellFrom({ cell, isDeposit: false, client });
+        yield daoCellFrom({ cell, isDeposit: false, client });
       }
     }
   }

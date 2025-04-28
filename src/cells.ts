@@ -37,8 +37,7 @@ export interface DaoCell {
  *
  * @throws Error if the cell is not found.
  */
-
-export async function DaoCellFrom(
+export async function daoCellFrom(
   options:
     | Omit<DaoCell, "interests" | "maturity">
     | {
