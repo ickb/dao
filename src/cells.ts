@@ -1,5 +1,10 @@
 import { ccc, mol } from "@ckb-ccc/core";
-import { getHeader, type TransactionHeader } from "@ickb/utils";
+import {
+  epochAdd,
+  epochCompare,
+  getHeader,
+  type TransactionHeader,
+} from "@ickb/utils";
 
 /**
  * Represents a DAO cell with its associated properties.
@@ -23,6 +28,13 @@ export interface DaoCell {
 
   /** The maturity epoch of the DAO cell. */
   maturity: ccc.Epoch;
+
+  /**
+   * Indicates the readiness to be consumed by a transaction.
+   * In case of deposit, it is false if the cycle renewal is less than minLockUp away,
+   * while in case of withdrawal request, it indicates the readiness for withdrawal.
+   */
+  isReady: boolean;
 }
 
 /**
@@ -30,28 +42,31 @@ export interface DaoCell {
  *
  * @param options - The options to create a DaoCell. It can be one of the following:
  * - An object omitting "interests" and "maturity" from DaoCell.
- * - An object containing a cell, isDeposit flag, client, and an optional tip.
- * - An object containing an outpoint, isDeposit flag, client, and an optional tip.
+ * - An object containing a cell, isDeposit flag and client.
+ * - An object containing an outpoint, isDeposit flag and client.
+ *
+ * The options object also include:
+ * - `tip`: The current tip block header.
+ * - `minLockUp`: An optional minimum lock-up period in epochs.
  *
  * @returns A promise that resolves to a DaoCell.
  *
  * @throws Error if the cell is not found.
  */
 export async function daoCellFrom(
-  options:
+  options: (
     | Omit<DaoCell, "interests" | "maturity">
     | {
         cell: ccc.Cell;
         isDeposit: boolean;
         client: ccc.Client;
-        tip?: ccc.ClientBlockHeader;
       }
     | {
         outpoint: ccc.OutPoint;
         isDeposit: boolean;
         client: ccc.Client;
-        tip?: ccc.ClientBlockHeader;
-      },
+      }
+  ) & { tip: ccc.ClientBlockHeader; minLockUp?: ccc.Epoch },
 ): Promise<DaoCell> {
   const isDeposit = options.isDeposit;
   const cell =
@@ -62,6 +77,7 @@ export async function daoCellFrom(
     throw Error("Cell not found");
   }
 
+  const tip = options.tip;
   const txHash = cell.outPoint.txHash;
   const oldest =
     "headers" in options
@@ -92,7 +108,7 @@ export async function daoCellFrom(
             }),
             txHash,
           }
-        : { header: options.tip ?? (await options.client.getTipHeader()) };
+        : { header: tip };
 
   const interests = ccc.calcDaoProfit(
     cell.capacityFree,
@@ -101,11 +117,22 @@ export async function daoCellFrom(
   );
   const maturity = ccc.calcDaoClaimEpoch(oldest.header, newest.header);
 
+  // Deposit: maturity > tip.epoch + minLockUp (default minLockUp 15 minutes)
+  // WithdrawalRequest: maturity > tip.epoch
+  const isReady =
+    epochCompare(
+      maturity,
+      isDeposit
+        ? epochAdd(tip.epoch, options.minLockUp ?? [0n, 1n, 16n])
+        : tip.epoch,
+    ) == 1;
+
   return {
     cell,
     isDeposit,
     headers: [oldest, newest],
     interests,
     maturity,
+    isReady,
   };
 }

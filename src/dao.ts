@@ -214,13 +214,11 @@ export class DaoManager implements ScriptDeps {
     client: ccc.Client,
     locks: ccc.ScriptLike[],
     options?: {
-      tip?: ccc.ClientBlockHeaderLike;
+      tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
     },
   ): AsyncGenerator<DaoCell> {
-    const tip = options?.tip
-      ? ccc.ClientBlockHeader.from(options.tip)
-      : await client.getTipHeader();
+    const tip = options?.tip ?? (await client.getTipHeader());
 
     for (const lock of locks) {
       const findCellsArgs = [
@@ -257,6 +255,7 @@ export class DaoManager implements ScriptDeps {
    * @param client - The client used to interact with the blockchain.
    * @param locks - The lock scripts to filter withdrawal requests.
    * @param options - Optional parameters for the search.
+   * @param options.tip - An optional tip block header to use as a reference.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
    * @returns An async generator that yields withdrawal requests in form of DaoCells.
    */
@@ -264,9 +263,12 @@ export class DaoManager implements ScriptDeps {
     client: ccc.Client,
     locks: ccc.ScriptLike[],
     options?: {
+      tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
     },
   ): AsyncGenerator<DaoCell> {
+    const tip = options?.tip ?? (await client.getTipHeader());
+
     for (const lock of locks) {
       const findCellsArgs = [
         {
@@ -289,7 +291,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield daoCellFrom({ cell, isDeposit: false, client });
+        yield daoCellFrom({ cell, isDeposit: false, client, tip });
       }
     }
   }
