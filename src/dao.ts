@@ -22,7 +22,8 @@ export class DaoManager implements ScriptDeps {
    *
    * @returns A new instance of DaoManager.
    */
-  static fromDeps(deps: ScriptDeps): DaoManager {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static fromDeps(deps: ScriptDeps, ..._: never[]): DaoManager {
     return new DaoManager(deps.script, deps.cellDeps);
   }
 
