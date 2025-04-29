@@ -26,12 +26,12 @@ export interface DaoCell {
   /** The interests accrued on the DAO cell. */
   interests: ccc.Num;
 
-  /** The maturity epoch of the DAO cell. */
+  /** The maturity epoch of the DAO cell. In case of deposit, it's calculated from tip plus minLockUp. */
   maturity: ccc.Epoch;
 
   /**
    * Indicates the readiness to be consumed by a transaction.
-   * In case of deposit, it is false if the cycle renewal is less than minLockUp away,
+   * In case of deposit, it is false if the cycle renewal is less than minLockUp or more than maxLockUp away,
    * while in case of withdrawal request, it indicates the readiness for withdrawal.
    */
   isReady: boolean;
@@ -47,7 +47,8 @@ export interface DaoCell {
  *
  * The options object also include:
  * - `tip`: The current tip block header.
- * - `minLockUp`: An optional minimum lock-up period in epochs.
+ * - `minLockUp`: An optional minimum lock-up period in epochs (Default 15 minutes)
+ * - `maxLockUp`: An optional maximum lock-up period in epochs (Default 3 days)
  *
  * @returns A promise that resolves to a DaoCell.
  *
@@ -66,7 +67,11 @@ export async function daoCellFrom(
         isDeposit: boolean;
         client: ccc.Client;
       }
-  ) & { tip: ccc.ClientBlockHeader; minLockUp?: ccc.Epoch },
+  ) & {
+    tip: ccc.ClientBlockHeader;
+    minLockUp?: ccc.Epoch;
+    maxLockUp?: ccc.Epoch;
+  },
 ): Promise<DaoCell> {
   const isDeposit = options.isDeposit;
   const cell =
@@ -115,17 +120,31 @@ export async function daoCellFrom(
     oldest.header,
     newest.header,
   );
-  const maturity = ccc.calcDaoClaimEpoch(oldest.header, newest.header);
+  let maturity = ccc.calcDaoClaimEpoch(oldest.header, newest.header);
 
-  // Deposit: maturity > tip.epoch + minLockUp (default minLockUp 15 minutes)
+  // Deposit: maturity > tip.epoch + minLockUp
   // WithdrawalRequest: maturity > tip.epoch
-  const isReady =
+  let isReady =
     epochCompare(
       maturity,
       isDeposit
-        ? epochAdd(tip.epoch, options.minLockUp ?? [0n, 1n, 16n])
+        ? epochAdd(tip.epoch, options.minLockUp ?? [0n, 1n, 16n]) // 15 minutes
         : tip.epoch,
     ) == 1;
+
+  if (isDeposit) {
+    // Deposit: maturity < tip.epoch + maxLockUp
+    if (!isReady) {
+      // This deposit is late for this cycle and it will be withdrawable in the next cycle
+      maturity = epochAdd(maturity, [180n, 0n, 1n]);
+      // isReady = true; // Ready for next cycle
+    }
+    isReady =
+      epochCompare(
+        epochAdd(tip.epoch, options.maxLockUp ?? [18n, 0n, 1n]), // 3 days
+        maturity,
+      ) == 1;
+  }
 
   return {
     cell,

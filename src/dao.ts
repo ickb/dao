@@ -208,6 +208,8 @@ export class DaoManager implements ScriptDeps {
    * @param options - Optional parameters for the search.
    * @param options.tip - An optional tip block header to use as a reference.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
+   * @param options.minLockUp: An optional minimum lock-up period in epochs (Default 15 minutes)
+   * @param options.maxLockUp: An optional maximum lock-up period in epochs (Default 3 days)
    * @returns An async generator that yields deposits in form of DaoCells.
    */
   async *findDeposits(
@@ -216,6 +218,8 @@ export class DaoManager implements ScriptDeps {
     options?: {
       tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
+      minLockUp?: ccc.Epoch;
+      maxLockUp?: ccc.Epoch;
     },
   ): AsyncGenerator<DaoCell> {
     const tip = options?.tip ?? (await client.getTipHeader());
@@ -244,7 +248,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield daoCellFrom({ cell, isDeposit: true, client, tip });
+        yield daoCellFrom({ cell, ...options, isDeposit: true, client, tip });
       }
     }
   }
@@ -291,7 +295,7 @@ export class DaoManager implements ScriptDeps {
           continue;
         }
 
-        yield daoCellFrom({ cell, isDeposit: false, client, tip });
+        yield daoCellFrom({ cell, ...options, isDeposit: false, client, tip });
       }
     }
   }
