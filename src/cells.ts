@@ -4,12 +4,13 @@ import {
   epochCompare,
   getHeader,
   type TransactionHeader,
+  type ValueComponents,
 } from "@ickb/utils";
 
 /**
  * Represents a DAO cell with its associated properties.
  */
-export interface DaoCell {
+export interface DaoCell extends ValueComponents {
   /** The DAO cell. */
   cell: ccc.Cell;
 
@@ -146,6 +147,9 @@ export async function daoCellFrom(
       ) == 1;
   }
 
+  const ckbValue = cell.cellOutput.capacity + interests;
+  const udtValue = ccc.Zero;
+
   return {
     cell,
     isDeposit,
@@ -153,5 +157,7 @@ export async function daoCellFrom(
     interests,
     maturity,
     isReady,
+    ckbValue,
+    udtValue,
   };
 }
