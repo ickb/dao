@@ -83,6 +83,10 @@ export class DaoManager implements ScriptDeps {
     capacities: ccc.FixedPoint[],
     lock: ccc.Script,
   ): void {
+    if (capacities.length === 0) {
+      return;
+    }
+
     tx.addCellDeps(this.cellDeps);
 
     for (const capacity of capacities) {
