@@ -13,8 +13,8 @@ export class DaoManager implements ScriptDeps {
    * @param cellDeps - An array of cell dependencies for the NervosDAO.
    */
   constructor(
-    public script: ccc.Script,
-    public cellDeps: ccc.CellDep[],
+    public readonly script: ccc.Script,
+    public readonly cellDeps: ccc.CellDep[],
   ) {}
 
   /**
@@ -33,11 +33,11 @@ export class DaoManager implements ScriptDeps {
    * @param cell - The cell to check.
    * @returns True if the cell is a deposit, otherwise false.
    */
-  isDeposit(cell: ccc.CellLike): boolean {
+  isDeposit(cell: ccc.Cell): boolean {
     const {
       cellOutput: { type },
       outputData,
-    } = ccc.Cell.from(cell);
+    } = cell;
 
     return (
       outputData === DaoManager.depositData() && type?.eq(this.script) === true
@@ -50,11 +50,11 @@ export class DaoManager implements ScriptDeps {
    * @param cell - The cell to check.
    * @returns True if the cell is a withdrawal request, otherwise false.
    */
-  isWithdrawalRequest(cell: ccc.CellLike): boolean {
+  isWithdrawalRequest(cell: ccc.Cell): boolean {
     const {
       cellOutput: { type },
       outputData,
-    } = ccc.Cell.from(cell);
+    } = cell;
 
     return (
       outputData !== DaoManager.depositData() && type?.eq(this.script) === true
@@ -80,17 +80,16 @@ export class DaoManager implements ScriptDeps {
    */
   deposit(
     tx: SmartTransaction,
-    capacities: ccc.FixedPointLike[],
-    lock: ccc.ScriptLike,
+    capacities: ccc.FixedPoint[],
+    lock: ccc.Script,
   ): void {
     tx.addCellDeps(this.cellDeps);
 
-    const l = ccc.Script.from(lock);
     for (const capacity of capacities) {
       tx.addOutput(
         {
           capacity,
-          lock: l,
+          lock,
           type: this.script,
         },
         DaoManager.depositData(),
@@ -113,7 +112,7 @@ export class DaoManager implements ScriptDeps {
   requestWithdrawal(
     tx: SmartTransaction,
     deposits: DaoCell[],
-    lock: ccc.ScriptLike,
+    lock: ccc.Script,
     sameSizeArgs = true,
   ): void {
     if (
@@ -214,7 +213,7 @@ export class DaoManager implements ScriptDeps {
    */
   async *findDeposits(
     client: ccc.Client,
-    locks: ccc.ScriptLike[],
+    locks: ccc.Script[],
     options?: {
       tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
@@ -265,7 +264,7 @@ export class DaoManager implements ScriptDeps {
    */
   async *findWithdrawalRequests(
     client: ccc.Client,
-    locks: ccc.ScriptLike[],
+    locks: ccc.Script[],
     options?: {
       tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
