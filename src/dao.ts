@@ -103,8 +103,10 @@ export class DaoManager implements ScriptDeps {
    * @param tx - The transaction to which the withdrawal request will be added.
    * @param deposits - An array of deposits to request the withdrawal from.
    * @param lock - The lock script for the withdrawal request cells.
-   * @param sameSizeArgs - Whether to enforce the same size for lock args (default: true).
-   * @returns void.
+   * @param options - Optional parameters for the withdrawal request.
+   * @param options.sameSizeOnly - Whether to enforce the same size for lock args (default: true).
+   * @param options.isReadyOnly - Whether to only process ready deposits (default: false).
+   * @returns void
    * @throws Error if the transaction has different input and output lengths.
    * @throws Error if the withdrawal request lock args have a different size from the deposit.
    * @throws Error if the transaction or header of deposit is not found.
@@ -113,8 +115,20 @@ export class DaoManager implements ScriptDeps {
     tx: SmartTransaction,
     deposits: DaoCell[],
     lock: ccc.Script,
-    sameSizeArgs = true,
+    options?: {
+      sameSizeOnly?: boolean;
+      isReadyOnly?: boolean;
+    },
   ): void {
+    const sameSizeOnly = options?.sameSizeOnly ?? true;
+    const isReadyOnly = options?.isReadyOnly ?? false;
+    if (isReadyOnly) {
+      deposits = deposits.filter((d) => d.isReady);
+    }
+    if (deposits.length === 0) {
+      return;
+    }
+
     if (
       tx.inputs.length != tx.outputs.length ||
       tx.outputs.length != tx.outputsData.length
@@ -122,27 +136,28 @@ export class DaoManager implements ScriptDeps {
       throw Error("Transaction have different inputs and outputs lengths");
     }
 
-    tx.addCellDeps(this.cellDeps);
-
-    const l = ccc.Script.from(lock);
     for (const deposit of deposits) {
       const { cell, isDeposit, headers } = deposit;
       if (!isDeposit) {
         throw Error("Not a deposit");
       }
-      if (sameSizeArgs && cell.cellOutput.lock.args.length != l.args.length) {
+      if (
+        sameSizeOnly &&
+        cell.cellOutput.lock.args.length != lock.args.length
+      ) {
         throw Error(
           "Withdrawal request lock args has different size from deposit",
         );
       }
 
+      tx.addCellDeps(this.cellDeps);
       const depositHeader = headers[0];
       tx.addHeaders(depositHeader);
       tx.addInput(cell);
       tx.addOutput(
         {
           capacity: cell.cellOutput.capacity,
-          lock: l,
+          lock,
           type: this.script,
         },
         mol.Uint64LE.encode(depositHeader.header.number),
@@ -155,9 +170,26 @@ export class DaoManager implements ScriptDeps {
    *
    * @param tx - The transaction to which the withdrawal will be added.
    * @param withdrawalRequests - An array of withdrawal requests to process.
-   * @returns void.
+   * @param options - Optional parameters for the withdrawal process.
+   * @param options.isReadyOnly - Whether to only process ready withdrawal requests (default: false).
+   * @returns void
+   * @throws Error if the withdrawal request is not valid.
    */
-  withdraw(tx: SmartTransaction, withdrawalRequests: DaoCell[]): void {
+  withdraw(
+    tx: SmartTransaction,
+    withdrawalRequests: DaoCell[],
+    options?: {
+      isReadyOnly?: boolean;
+    },
+  ): void {
+    const isReadyOnly = options?.isReadyOnly ?? false;
+    if (isReadyOnly) {
+      withdrawalRequests = withdrawalRequests.filter((d) => d.isReady);
+    }
+    if (withdrawalRequests.length === 0) {
+      return;
+    }
+
     tx.addCellDeps(this.cellDeps);
 
     for (const withdrawalRequest of withdrawalRequests) {
@@ -170,7 +202,6 @@ export class DaoManager implements ScriptDeps {
       if (isDeposit) {
         throw Error("Not a withdrawal request");
       }
-
       tx.addHeaders(headers);
       const depositHeader = headers[0];
       const headerIndex = tx.headerDeps.findIndex(
