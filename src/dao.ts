@@ -99,6 +99,12 @@ export class DaoManager implements ScriptDeps {
         DaoManager.depositData(),
       );
     }
+
+    // Check that there are at most 64 output cells, see:
+    // https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md#gotchas
+    if (tx.outputs.length > 64) {
+      throw Error("More than 64 output cells in a NervosDAO transaction");
+    }
   }
 
   /**
@@ -167,6 +173,12 @@ export class DaoManager implements ScriptDeps {
         mol.Uint64LE.encode(depositHeader.header.number),
       );
     }
+
+    // Check that there are at most 64 output cells, see:
+    // https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md#gotchas
+    if (tx.outputs.length > 64) {
+      throw Error("More than 64 output cells in a NervosDAO transaction");
+    }
   }
 
   /**
@@ -231,6 +243,12 @@ export class DaoManager implements ScriptDeps {
       }
       witness.inputType = ccc.hexFrom(ccc.numLeToBytes(headerIndex, 8));
       tx.setWitnessArgsAt(inputIndex, witness);
+    }
+
+    // Check that there are at most 64 output cells, see:
+    // https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0023-dao-deposit-withdraw/0023-dao-deposit-withdraw.md#gotchas
+    if (tx.outputs.length > 64) {
+      throw Error("More than 64 output cells in a NervosDAO transaction");
     }
   }
 
