@@ -18,13 +18,17 @@ export class DaoManager implements ScriptDeps {
   ) {}
 
   /**
-   * Returns a new instance of DaoManager.
-   *
-   * @returns A new instance of DaoManager.
+   * Creates an instance of DaoManager from script dependencies.
+   * @param deps - The script dependencies.
+   * @param deps.udt - The script dependencies for UDT.
+   * @returns An instance of DaoManager.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  static fromDeps(deps: ScriptDeps, ..._: never[]): DaoManager {
-    return new DaoManager(deps.script, deps.cellDeps);
+  static fromDeps(
+    { dao }: { dao: ScriptDeps },
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ..._: never[]
+  ): DaoManager {
+    return new DaoManager(dao.script, dao.cellDeps);
   }
 
   /**
