@@ -1,5 +1,5 @@
 import { ccc, mol } from "@ckb-ccc/core";
-import type { ScriptDeps, SmartTransaction } from "@ickb/utils";
+import { unique, type ScriptDeps, type SmartTransaction } from "@ickb/utils";
 import { daoCellFrom as daoCellFrom, type DaoCell } from "./cells.js";
 
 /**
@@ -280,7 +280,7 @@ export class DaoManager implements ScriptDeps {
   ): AsyncGenerator<DaoCell> {
     const tip = options?.tip ?? (await client.getTipHeader());
 
-    for (const lock of locks) {
+    for (const lock of unique(locks)) {
       const findCellsArgs = [
         {
           script: lock,
@@ -329,7 +329,7 @@ export class DaoManager implements ScriptDeps {
   ): AsyncGenerator<DaoCell> {
     const tip = options?.tip ?? (await client.getTipHeader());
 
-    for (const lock of locks) {
+    for (const lock of unique(locks)) {
       const findCellsArgs = [
         {
           script: lock,
