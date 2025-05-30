@@ -1,7 +1,6 @@
 import { ccc, mol } from "@ckb-ccc/core";
 import {
-  epochAdd,
-  epochCompare,
+  Epoch,
   getHeader,
   type TransactionHeader,
   type ValueComponents,
@@ -28,7 +27,7 @@ export interface DaoCell extends ValueComponents {
   interests: ccc.Num;
 
   /** The maturity epoch of the DAO cell. In case of deposit, it's calculated from tip plus minLockUp. */
-  maturity: ccc.Epoch;
+  maturity: Epoch;
 
   /**
    * Indicates the readiness to be consumed by a transaction.
@@ -70,8 +69,8 @@ export async function daoCellFrom(
       }
   ) & {
     tip: ccc.ClientBlockHeader;
-    minLockUp?: ccc.Epoch;
-    maxLockUp?: ccc.Epoch;
+    minLockUp?: Epoch;
+    maxLockUp?: Epoch;
   },
 ): Promise<DaoCell> {
   const isDeposit = options.isDeposit;
@@ -121,34 +120,31 @@ export async function daoCellFrom(
     oldest.header,
     newest.header,
   );
-  let maturity = ccc.calcDaoClaimEpoch(oldest.header, newest.header);
+  let maturity = Epoch.from(
+    ccc.calcDaoClaimEpoch(oldest.header, newest.header),
+  );
 
-  // Deposit: maturity > tip.epoch + minLockUp
+  const minLockUp = options.minLockUp ?? defaultMinLockUp;
+  const maxLockUp = options.maxLockUp ?? defaultMaxLockUp;
+
+  // Deposit: maturity > minLockUp + tip.epoch
   // WithdrawalRequest: maturity > tip.epoch
-  let isReady =
-    epochCompare(
-      maturity,
-      isDeposit
-        ? epochAdd(tip.epoch, options.minLockUp ?? [0n, 1n, 16n]) // 15 minutes
-        : tip.epoch,
-    ) == 1;
+  let isReady = isDeposit
+    ? maturity.compare(minLockUp.add(tip.epoch)) > 0
+    : maturity.compare(tip.epoch) > 0;
 
   if (isDeposit) {
     // Deposit: maturity < tip.epoch + maxLockUp
     if (!isReady) {
       // This deposit is late for this cycle and it will be withdrawable in the next cycle
-      maturity = epochAdd(maturity, [180n, 0n, 1n]);
+      maturity = maturity.add([180n, 0n, 1n]);
       // isReady = true; // Ready for next cycle
     }
-    isReady =
-      epochCompare(
-        epochAdd(tip.epoch, options.maxLockUp ?? [18n, 0n, 1n]), // 3 days
-        maturity,
-      ) == 1;
+    isReady = maxLockUp.add(tip.epoch).compare(maturity) > 0;
   }
 
   const ckbValue = cell.cellOutput.capacity + interests;
-  const udtValue = ccc.Zero;
+  const udtValue = 0n;
 
   return {
     cell,
@@ -161,3 +157,27 @@ export async function daoCellFrom(
     udtValue,
   };
 }
+
+/**
+ * The default minimum lock-up period represented as an Epoch.
+ *
+ * Calculated from the tuple [0n, 1n, 24n]:
+ * - 0 whole epochs,
+ * - plus 1/24 of an epoch.
+ *
+ * Given each epoch represents 4 hours (14400000 milliseconds),
+ * then 1/24 of an epoch equals: (14400000 / 24) = 600000 milliseconds, i.e. 10 minutes.
+ */
+const defaultMinLockUp = Epoch.from([0n, 1n, 24n]); // 10 minutes
+
+/**
+ * The default maximum lock-up period represented as an Epoch.
+ *
+ * Calculated from the tuple [18n, 0n, 1n]:
+ * - 18 whole epochs,
+ * - plus 0/1 of an additional epoch.
+ *
+ * With each epoch lasting 4 hours, 18 epochs equal 18 * 4 hours = 72 hours,
+ * i.e. 3 days.
+ */
+const defaultMaxLockUp = Epoch.from([18n, 0n, 1n]); // 3 days

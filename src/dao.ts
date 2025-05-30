@@ -1,6 +1,11 @@
 import { ccc, mol } from "@ckb-ccc/core";
-import { unique, type ScriptDeps, type SmartTransaction } from "@ickb/utils";
-import { daoCellFrom as daoCellFrom, type DaoCell } from "./cells.js";
+import {
+  Epoch,
+  unique,
+  type ScriptDeps,
+  type SmartTransaction,
+} from "@ickb/utils";
+import { daoCellFrom, type DaoCell } from "./cells.js";
 
 /**
  * Manage NervosDAO functionalities.
@@ -236,7 +241,7 @@ export class DaoManager implements ScriptDeps {
           since: {
             relative: "absolute",
             metric: "epoch",
-            value: ccc.epochToHex(maturity),
+            value: maturity.toHex(),
           },
         }) - 1;
 
@@ -264,7 +269,7 @@ export class DaoManager implements ScriptDeps {
    * @param options - Optional parameters for the search.
    * @param options.tip - An optional tip block header to use as a reference.
    * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
-   * @param options.minLockUp: An optional minimum lock-up period in epochs (Default 15 minutes)
+   * @param options.minLockUp: An optional minimum lock-up period in epochs (Default 10 minutes)
    * @param options.maxLockUp: An optional maximum lock-up period in epochs (Default 3 days)
    * @returns An async generator that yields deposits in form of DaoCells.
    */
@@ -274,8 +279,8 @@ export class DaoManager implements ScriptDeps {
     options?: {
       tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
-      minLockUp?: ccc.Epoch;
-      maxLockUp?: ccc.Epoch;
+      minLockUp?: Epoch;
+      maxLockUp?: Epoch;
     },
   ): AsyncGenerator<DaoCell> {
     const tip = options?.tip ?? (await client.getTipHeader());
