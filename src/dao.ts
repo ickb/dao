@@ -1,5 +1,6 @@
 import { ccc, mol } from "@ckb-ccc/core";
 import {
+  defaultFindCellsLimit,
   Epoch,
   unique,
   type ScriptDeps,
@@ -262,16 +263,48 @@ export class DaoManager implements ScriptDeps {
   }
 
   /**
-   * Asynchronously finds deposits associated with a given lock script.
+   * Async generator that finds and yields DAO deposit cells for the specified lock scripts.
    *
-   * @param client - The client used to interact with the blockchain.
-   * @param locks - The lock scripts to filter deposits.
-   * @param options - Optional parameters for the search.
-   * @param options.tip - An optional tip block header to use as a reference.
-   * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
-   * @param options.minLockUp: An optional minimum lock-up period in epochs (Default 10 minutes)
-   * @param options.maxLockUp: An optional maximum lock-up period in epochs (Default 3 days)
-   * @returns An async generator that yields deposits in form of DaoCells.
+   * @param client
+   *   A CKB client instance that implements:
+   *   - `findCells(query, order, limit)`     — cached searches
+   *   - `findCellsOnChain(query, order, limit)` — direct on-chain searches
+   *
+   * @param locks
+   *   An array of lock scripts. Only cells whose `cellOutput.lock` exactly matches
+   *   one of these scripts will be considered.
+   *
+   * @param options
+   *   Optional parameters to refine the search:
+   *   - `tip?: ClientBlockHeader`
+   *       Reference block header for epoch and block-number lookups.
+   *       Defaults to `await client.getTipHeader()`.
+   *   - `onChain?: boolean`
+   *       If `true`, uses `findCellsOnChain`; otherwise, uses `findCells`.
+   *       Default: `false`.
+   *   - `minLockUp?: Epoch`
+   *       Minimum lock-up period required (in epochs).
+   *       Defaults to the manager’s configured minimum (≈10 minutes).
+   *   - `maxLockUp?: Epoch`
+   *       Maximum lock-up period allowed (in epochs).
+   *       Defaults to the manager’s configured maximum (≈3 days).
+   *   - `limit?: number`
+   *       Batch size per lock script. Defaults to `defaultFindCellsLimit` (400).
+   *
+   * @yields
+   *   {@link DaoCell} objects representing deposit cells.
+   *
+   * @remarks
+   * - Deduplicates `locks` via `unique(locks)`.
+   * - Applies an RPC filter with:
+   *     • `script: this.script` (DAO type script)
+   *     • `outputData: DaoManager.depositData()` (deposit flag)
+   *     • `outputDataSearchMode: "exact"`
+   * - Skips any cell that:
+   *     1. Fails `this.isDeposit(cell)`
+   *     2. Has a non-matching lock script
+   * - Each yielded `DaoCell` is constructed via:
+   *     `daoCellFrom({ cell, ...options, isDeposit: true, client, tip })`
    */
   async *findDeposits(
     client: ccc.Client,
@@ -281,9 +314,11 @@ export class DaoManager implements ScriptDeps {
       onChain?: boolean;
       minLockUp?: Epoch;
       maxLockUp?: Epoch;
+      limit?: number;
     },
   ): AsyncGenerator<DaoCell> {
     const tip = options?.tip ?? (await client.getTipHeader());
+    const limit = options?.limit ?? defaultFindCellsLimit;
 
     for (const lock of unique(locks)) {
       const findCellsArgs = [
@@ -299,7 +334,7 @@ export class DaoManager implements ScriptDeps {
           withData: true,
         },
         "asc",
-        400, // https://github.com/nervosnetwork/ckb/pull/4576
+        limit,
       ] as const;
 
       for await (const cell of options?.onChain
@@ -315,14 +350,41 @@ export class DaoManager implements ScriptDeps {
   }
 
   /**
-   * Asynchronously finds withdrawal requests associated with a given lock script.
+   * Async generator that finds and yields DAO withdrawal‐request cells
+   * for the specified lock scripts.
    *
-   * @param client - The client used to interact with the blockchain.
-   * @param locks - The lock scripts to filter withdrawal requests.
-   * @param options - Optional parameters for the search.
-   * @param options.tip - An optional tip block header to use as a reference.
-   * @param options.onChain - A boolean indicating whether to use the cells cache or directly search on-chain.
-   * @returns An async generator that yields withdrawal requests in form of DaoCells.
+   * @param client
+   *   A CKB client instance that implements:
+   *   - `findCells(query, order, limit)`     — cached searches
+   *   - `findCellsOnChain(query, order, limit)` — direct on-chain searches
+   *
+   * @param locks
+   *   An array of lock scripts. Only cells whose `cellOutput.lock` exactly matches
+   *   one of these scripts will be considered.
+   *
+   * @param options
+   *   Optional parameters to refine the search:
+   *   - `tip?: ClientBlockHeader`
+   *       Reference block header for epoch and block-number lookups.
+   *       Defaults to `await client.getTipHeader()`.
+   *   - `onChain?: boolean`
+   *       If `true`, uses `findCellsOnChain`; otherwise, uses `findCells`.
+   *       Default: `false`.
+   *   - `limit?: number`
+   *       Batch size per lock script. Defaults to `defaultFindCellsLimit` (400).
+   *
+   * @yields
+   *   {@link DaoCell} objects representing withdrawal‐request cells.
+   *
+   * @remarks
+   * - Deduplicates `locks` via `unique(locks)`.
+   * - Applies an RPC filter with:
+   *     • `script: this.script` (DAO type script)
+   * - Skips any cell that:
+   *     1. Fails `this.isWithdrawalRequest(cell)`
+   *     2. Has a non-matching lock script
+   * - Each yielded `DaoCell` is constructed via:
+   *     `daoCellFrom({ cell, ...options, isDeposit: false, client, tip })`
    */
   async *findWithdrawalRequests(
     client: ccc.Client,
@@ -330,9 +392,11 @@ export class DaoManager implements ScriptDeps {
     options?: {
       tip?: ccc.ClientBlockHeader;
       onChain?: boolean;
+      limit?: number;
     },
   ): AsyncGenerator<DaoCell> {
     const tip = options?.tip ?? (await client.getTipHeader());
+    const limit = options?.limit ?? defaultFindCellsLimit;
 
     for (const lock of unique(locks)) {
       const findCellsArgs = [
@@ -346,7 +410,7 @@ export class DaoManager implements ScriptDeps {
           withData: true,
         },
         "asc",
-        400, // https://github.com/nervosnetwork/ckb/pull/4576
+        limit,
       ] as const;
 
       for await (const cell of options?.onChain
