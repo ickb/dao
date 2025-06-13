@@ -1,6 +1,6 @@
 {
   "name": "@ickb/dao",
-  "version": "1000.0.80",
+  "version": "1000.0.81",
   "description": "NervosDAO utilities built on top of CCC",
   "keywords": [
     "ickb",
@@ -54,6 +54,6 @@
   },
   "dependencies": {
     "@ckb-ccc/core": "^1.9.0",
-    "@ickb/utils": "^1000.0.80"
+    "@ickb/utils": "^1000.0.81"
   }
 }
